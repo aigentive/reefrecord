@@ -25,7 +25,7 @@ Records microphone + system audio and transcribes with Gemini Flash. Sessions (W
 
 ```bash
 # clone the repo
-git clone <repo-url> && cd deepgram
+git clone <repo-url> && cd recorder
 
 # create a virtual environment
 python3 -m venv venv
