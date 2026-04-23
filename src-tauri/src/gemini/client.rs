@@ -70,8 +70,6 @@ struct FileStartResponse {
 struct FileInfo {
     uri: String,
     name: String,
-    #[serde(default)]
-    state: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

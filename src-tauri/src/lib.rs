@@ -10,6 +10,7 @@ pub mod settings;
 
 use std::sync::Arc;
 
+use tauri::Manager;
 use tokio::sync::RwLock;
 
 use crate::services::recording::RecordingService;

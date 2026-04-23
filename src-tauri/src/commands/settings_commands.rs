@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
@@ -98,9 +96,7 @@ pub async fn select_sessions_folder(
     if !std::path::Path::new(&path_str).exists() {
         std::fs::create_dir_all(&path_str)?;
     }
-    let sessions = state.sessions.clone();
-    let s = sessions as Arc<_>;
-    s.reload()?;
+    state.sessions.reload()?;
     Ok(Some(path_str))
 }
 

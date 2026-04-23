@@ -5,7 +5,7 @@ use std::time::Instant;
 use chrono::Utc;
 use serde::Deserialize;
 
-use crate::audio::capture::{resolve_input_device, start_capture, InputCapture};
+use crate::audio::capture::{start_capture, InputCapture};
 use crate::audio::writer::{mix_mono_i16, write_wav_mono_i16};
 use crate::error::{AppError, AppResult};
 use crate::services::sessions::{
@@ -63,22 +63,15 @@ impl RecordingService {
             started_at_utc.format("%Y%m%d_%H%M%S")
         );
 
-        let mic_device = resolve_input_device(input.mic_device_selector.as_deref(), false)
+        let mic = start_capture(input.mic_device_selector.clone(), false, "mic")
             .map_err(|e| match e {
                 AppError::Audio(msg) => AppError::Audio(format!("microphone: {msg}")),
                 other => other,
             })?;
-        let mic = start_capture(mic_device, "mic")?;
 
         let system = if input.capture_system_audio {
-            match resolve_input_device(input.system_audio_device_selector.as_deref(), true) {
-                Ok(d) => match start_capture(d, "system") {
-                    Ok(s) => Some(s),
-                    Err(e) => {
-                        tracing::warn!("system audio stream failed: {e}");
-                        None
-                    }
-                },
+            match start_capture(input.system_audio_device_selector.clone(), true, "system") {
+                Ok(s) => Some(s),
                 Err(e) => {
                     tracing::info!("system audio not available: {e}");
                     None
