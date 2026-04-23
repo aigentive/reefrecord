@@ -1,4 +1,15 @@
 .env
 keys
-sessions/
+/sessions/
 __pycache__/
+.progress.md
+node_modules/
+dist/
+target/
+.DS_Store
+src-tauri/target/
+src-tauri/gen/
+frontend/dist/
+frontend/node_modules/
+
+tsconfig.tsbuildinfo

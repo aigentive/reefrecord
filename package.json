@@ -1,0 +1,13 @@
+{
+  "name": "reef-recorder-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reef Recorder — desktop recorder and Gemini transcription",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "frontend:install": "cd frontend && npm install",
+    "tauri:dev": "cd frontend && npx tauri dev",
+    "tauri:build": "cd frontend && npx tauri build",
+    "typecheck": "cd frontend && npm run typecheck"
+  }
+}

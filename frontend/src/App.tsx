@@ -1,0 +1,258 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Settings as SettingsIcon } from "lucide-react";
+import { SetupRail } from "./features/setup/SetupRail";
+import { InlineSetup } from "./features/setup/InlineSetup";
+import { RecorderPanel } from "./features/recorder/RecorderPanel";
+import { SessionList } from "./features/sessions/SessionList";
+import { TranscriptDrawer } from "./features/sessions/TranscriptDrawer";
+import { SettingsSheet } from "./features/settings/SettingsSheet";
+import type { AppStatus, SessionSummary, Settings } from "./api/types";
+import {
+  getAppStatus,
+  getSettings,
+  listSessions,
+} from "./api/bridge";
+
+export type SetupPanelKey =
+  | "gemini"
+  | "folder"
+  | "mic"
+  | "systemAudio"
+  | "github"
+  | null;
+
+export function App() {
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null
+  );
+  const [openPanel, setOpenPanel] = useState<SetupPanelKey>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const s = await getAppStatus();
+      setStatus(s);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  const refreshSettings = useCallback(async () => {
+    try {
+      const s = await getSettings();
+      setSettings(s);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    try {
+      const s = await listSessions();
+      setSessions(s);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshStatus();
+    refreshSettings();
+    refreshSessions();
+  }, [refreshStatus, refreshSettings, refreshSessions]);
+
+  // Progressive setup: if required items are missing, auto-open the first one.
+  useEffect(() => {
+    if (!status) return;
+    if (openPanel !== null) return;
+    if (status.gemini.state !== "ready") {
+      setOpenPanel("gemini");
+      return;
+    }
+    if (status.folder.state !== "ready") {
+      setOpenPanel("folder");
+      return;
+    }
+    if (status.mic.state === "denied") {
+      setOpenPanel("mic");
+    }
+  }, [status, openPanel]);
+
+  const selectedSession = useMemo(
+    () => sessions.find((s) => s.id === selectedSessionId) ?? null,
+    [sessions, selectedSessionId]
+  );
+
+  const overallLabel = useMemo(() => {
+    if (!status) return "Loading";
+    if (status.canRecord) return "Ready to record";
+    return status.blockingReason || "Setup required";
+  }, [status]);
+
+  const overallState = !status
+    ? "checking"
+    : status.canRecord
+    ? "ready"
+    : "missing";
+
+  const handleSessionCompleted = useCallback(
+    (session: SessionSummary) => {
+      setSessions((prev) => {
+        const next = prev.filter((s) => s.id !== session.id);
+        return [session, ...next];
+      });
+      setSelectedSessionId(session.id);
+    },
+    []
+  );
+
+  const handleSessionUpdated = useCallback((updated: SessionSummary) => {
+    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  }, []);
+
+  return (
+    <div className="app">
+      <header className="app-top">
+        <div className="app-title">
+          <span className="app-title-mark" aria-hidden />
+          Reef Recorder
+        </div>
+        <div className="row">
+          <span className="chip" data-state={overallState}>
+            <span className="dot" data-state={overallState} />
+            {overallLabel}
+          </span>
+          <button
+            type="button"
+            className="btn btn-icon"
+            aria-label="Open settings"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <SettingsIcon size={16} />
+          </button>
+        </div>
+      </header>
+
+      <main className="app-main">
+        <section className="app-main-left">
+          <div className="panel">
+            <h2 className="panel-title">Setup</h2>
+            <SetupRail
+              status={status}
+              openPanel={openPanel}
+              onToggle={(key) =>
+                setOpenPanel((prev) => (prev === key ? null : key))
+              }
+            />
+          </div>
+
+          {openPanel && (
+            <InlineSetup
+              panel={openPanel}
+              status={status}
+              settings={settings}
+              onClose={() => setOpenPanel(null)}
+              onChanged={async () => {
+                await refreshStatus();
+                await refreshSettings();
+              }}
+            />
+          )}
+
+          <div className="panel">
+            <h2 className="panel-title">Recorder</h2>
+            <RecorderPanel
+              status={status}
+              settings={settings}
+              onCompleted={handleSessionCompleted}
+              onSessionUpdated={handleSessionUpdated}
+              onRefreshStatus={refreshStatus}
+            />
+          </div>
+
+          {selectedSession && (
+            <div className="panel transcript-drawer">
+              <div className="inline-setup-title">
+                <h3>Transcript — {selectedSession.id}</h3>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setSelectedSessionId(null)}
+                >
+                  Close
+                </button>
+              </div>
+              <TranscriptDrawer
+                session={selectedSession}
+                onSessionUpdated={handleSessionUpdated}
+              />
+            </div>
+          )}
+        </section>
+
+        <aside className="app-main-right">
+          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0 }}>
+            <div className="inline-setup-title">
+              <h3 style={{ margin: 0, fontSize: 14 }}>Sessions</h3>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {sessions.length} total
+              </span>
+            </div>
+            <SessionList
+              sessions={sessions}
+              selectedId={selectedSessionId}
+              onSelect={setSelectedSessionId}
+            />
+          </div>
+        </aside>
+      </main>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: 16,
+            right: 16,
+            maxWidth: 520,
+            margin: "0 auto",
+            background: "var(--surface)",
+            border: "1px solid var(--error)",
+            color: "var(--error)",
+            padding: "10px 14px",
+            borderRadius: "var(--radius)",
+            fontSize: 13,
+          }}
+        >
+          <div className="row">
+            <span>{error}</span>
+            <div className="spacer" />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setError(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && settings && (
+        <SettingsSheet
+          settings={settings}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={async (next) => {
+            setSettings(next);
+            await refreshStatus();
+          }}
+        />
+      )}
+    </div>
+  );
+}
