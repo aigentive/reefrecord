@@ -347,10 +347,11 @@ textarea.input {
 }
 
 .app-title-mark {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--teal-500);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: contain;
+  display: block;
 }
 
 .app-main {

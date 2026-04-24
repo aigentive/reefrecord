@@ -175,7 +175,12 @@ export function App() {
     <div className="app">
       <header className="app-top">
         <div className="app-title">
-          <span className="app-title-mark" aria-hidden />
+          <img
+            src="/logo.png"
+            alt=""
+            className="app-title-mark"
+            aria-hidden
+          />
           Reef Recorder
         </div>
         <div className="row">
