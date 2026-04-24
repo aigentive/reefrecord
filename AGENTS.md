@@ -38,7 +38,7 @@ Do not attempt `tauri dev` from an automation step — it's interactive and long
 
 - **Rust:** prefer `?` over `unwrap()`. Use `AppResult<T>`. Use `#[tauri::command]` on `async fn` that take `State<'_, AppState>`. Keep command bodies thin; push logic into `services/` or `gemini/` or `git_sync/`.
 - **TypeScript:** strict mode. `type` aliases over `interface` for DTOs. Props objects typed inline. Never use `any`. Use `noUncheckedIndexedAccess`.
-- **CSS:** global variables in `frontend/src/styles/global.css`. Never hardcode hex colors outside that file.
+- **CSS:** global variables in `frontend/src/styles/global.css`. Never hardcode hex colors outside that file. Palette + type come from the Teal Design System (teal-500 accent, paper-0 canvas, Inter + JetBrains Mono + Instrument Serif).
 
 ## Layout quick-ref
 

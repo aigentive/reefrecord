@@ -1,23 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 :root {
-  --bg: #FAFAF8;
+  /* Teal palette (teal 50–950) */
+  --teal-50:  #EAF5F3;
+  --teal-100: #CEE7E2;
+  --teal-200: #9FCFC6;
+  --teal-300: #6FB4A7;
+  --teal-400: #3F9A88;
+  --teal-500: #1F7F6E;
+  --teal-600: #166456;
+  --teal-700: #0F4C42;
+  --teal-800: #0A3830;
+  --teal-900: #062621;
+
+  /* Warm paper neutrals */
+  --paper-0:   #FDFBF6;
+  --paper-50:  #F7F3EA;
+  --paper-100: #EFE9DB;
+
+  /* Warm ink */
+  --ink-900: #14130F;
+  --ink-200: #2B2925;
+
+  /* Accents */
+  --coral: #E26D5A;
+  --amber: #E9B949;
+
+  /* Semantic tokens used by components */
+  --bg: var(--paper-0);
   --surface: #FFFFFF;
-  --text: #171717;
-  --muted: #6F6A63;
-  --border: #E7E0D6;
-  --accent: #F97316;
-  --accent-dark: #C2410C;
-  --success: #15803D;
-  --warning: #D97706;
-  --error: #DC2626;
+  --text: var(--ink-900);
+  --muted: #6B6862;
+  --border: #E3DCC9;
+  --border-strong: #CFC4AB;
+  --accent: var(--teal-500);
+  --accent-dark: var(--teal-700);
+  --success: var(--teal-400);
+  --warning: var(--amber);
+  --error: var(--coral);
 
   --radius: 8px;
-  --shadow-sm: 0 1px 2px rgba(23, 23, 23, 0.04);
-  --shadow-md: 0 4px 12px rgba(23, 23, 23, 0.06);
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
-    Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --shadow-xs: 0 1px 0 rgba(10, 56, 48, 0.04);
+  --shadow-sm: 0 1px 2px rgba(10, 56, 48, 0.06), 0 1px 1px rgba(10, 56, 48, 0.04);
+  --shadow-md: 0 6px 16px -6px rgba(10, 56, 48, 0.12), 0 2px 4px rgba(10, 56, 48, 0.06);
+  --font-display: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-family: var(--font-sans);
   color-scheme: light;
+}
+
+::selection {
+  background: var(--teal-200);
+  color: var(--teal-900);
 }
 
 * {
@@ -131,7 +167,7 @@ a:hover {
 
 .btn-ghost:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(23, 23, 23, 0.04);
+  background: rgba(10, 56, 48, 0.06);
 }
 
 .btn-icon {
@@ -153,7 +189,7 @@ a:hover {
 
 .btn-danger:hover:not(:disabled) {
   border-color: var(--error);
-  background: rgba(220, 38, 38, 0.05);
+  background: rgba(226, 109, 90, 0.08);
 }
 
 /* Input */
@@ -169,7 +205,7 @@ a:hover {
 .input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 0 0 3px rgba(31, 127, 110, 0.22);
 }
 
 /* Chips */
@@ -194,21 +230,21 @@ a:hover {
 
 .chip[data-state="ready"] {
   color: var(--success);
-  border-color: rgba(21, 128, 61, 0.35);
-  background: rgba(21, 128, 61, 0.06);
+  border-color: rgba(63, 154, 136, 0.45);
+  background: rgba(63, 154, 136, 0.10);
 }
 
 .chip[data-state="missing"],
 .chip[data-state="denied"] {
   color: var(--error);
-  border-color: rgba(220, 38, 38, 0.35);
-  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(226, 109, 90, 0.45);
+  background: rgba(226, 109, 90, 0.10);
 }
 
 .chip[data-state="warning"] {
   color: var(--warning);
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.06);
+  border-color: rgba(233, 185, 73, 0.55);
+  background: rgba(233, 185, 73, 0.14);
 }
 
 .chip[data-state="checking"] {
@@ -221,7 +257,7 @@ a:hover {
 
 .chip[data-selected="true"] {
   border-color: var(--text);
-  background: rgba(23, 23, 23, 0.04);
+  background: rgba(10, 56, 48, 0.06);
 }
 
 /* Status dot */
@@ -333,7 +369,8 @@ a:hover {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
-  box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35);
+  box-shadow: 0 10px 24px -8px rgba(10, 56, 48, 0.35),
+    0 4px 10px rgba(10, 56, 48, 0.15);
 }
 
 .record-btn:hover:not(:disabled) {
@@ -342,19 +379,20 @@ a:hover {
 }
 
 .record-btn:disabled {
-  background: #D7D2C8;
-  color: #8A857D;
-  box-shadow: none;
+  background: var(--paper-100);
+  color: #9C988F;
+  box-shadow: var(--shadow-xs);
   cursor: not-allowed;
 }
 
 .record-btn[data-state="recording"] {
-  background: var(--error);
-  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.35);
+  background: var(--coral);
+  box-shadow: 0 10px 24px -8px rgba(226, 109, 90, 0.45),
+    0 4px 10px rgba(226, 109, 90, 0.2);
 }
 
 .record-btn[data-state="recording"]:hover {
-  background: #B91C1C;
+  background: #C85642;
 }
 
 .recorder-timer {
@@ -474,7 +512,7 @@ a:hover {
 
 .session-row[data-selected="true"] {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 0 0 3px rgba(31, 127, 110, 0.22);
 }
 
 .session-row-head {
@@ -519,12 +557,12 @@ a:hover {
 .session-row-tag[data-state="complete"],
 .session-row-tag[data-state="synced"] {
   color: var(--success);
-  border-color: rgba(21, 128, 61, 0.3);
+  border-color: rgba(63, 154, 136, 0.35);
 }
 
 .session-row-tag[data-state="failed"] {
   color: var(--error);
-  border-color: rgba(220, 38, 38, 0.3);
+  border-color: rgba(226, 109, 90, 0.35);
 }
 
 .session-row-tag[data-state="pending"],
@@ -532,7 +570,7 @@ a:hover {
 .session-row-tag[data-state="queued"],
 .session-row-tag[data-state="syncing"] {
   color: var(--warning);
-  border-color: rgba(217, 119, 6, 0.3);
+  border-color: rgba(233, 185, 73, 0.5);
 }
 
 .session-row-tag[data-state="skipped"] {
@@ -571,7 +609,7 @@ a:hover {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(23, 23, 23, 0.28);
+  background: rgba(6, 38, 33, 0.42);
   display: flex;
   align-items: flex-start;
   justify-content: center;

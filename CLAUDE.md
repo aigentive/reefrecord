@@ -48,11 +48,12 @@ Important: `beforeBuildCommand` in `tauri.conf.json` is run from the **project r
 - `noEmit` is on in `tsconfig.json`; never commit emitted `.js`/`.d.ts` from `src/`.
 - API bridge: every `invoke` is wrapped in `src/api/bridge.ts`. Types live in `src/api/types.ts` and match Rust DTOs exactly (camelCase).
 - Readiness states: `ready | missing | denied | warning | checking | optional`. Warning is non-blocking; missing/denied block recording.
-- Lucide icons only. No emoji.
+- Lucide icons only. No emoji. Typographic marks (·, →, —) are fine.
+- Fonts: Inter for UI, JetBrains Mono for numerics/code, Instrument Serif available for display headings. All pulled from Google Fonts via `@import` in `global.css`.
 
 ### UI
 
-- Orange accent (`--accent: #F97316`) is the primary-action color. Never paint whole surfaces in orange.
+- Teal accent (`--accent: #1F7F6E`, from the Teal Design System) is the primary-action color. Never paint whole surfaces in teal; it's a pigment, not a glow.
 - Panels are flat cards; no nested cards. Border radius max 8px.
 - Status changes must also be reflected in text, not color alone (a11y).
 - Record/stop button is a fixed 112px circle. Timer never shifts layout.
