@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Reef Recorder app icon
+    Every element is defined as a symbol, composed via <use> into the scene.
+    Z-order: bg · waveforms · arc + bubbles · speech bubble · coral · mic
+  -->
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="gSea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#3AA9CD"/>
+      <stop offset="32%"  stop-color="#17588A"/>
+      <stop offset="74%"  stop-color="#0C3B67"/>
+      <stop offset="100%" stop-color="#082946"/>
+    </linearGradient>
+    <linearGradient id="gArc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#2E93AD"/>
+      <stop offset="55%"  stop-color="#4FBED0"/>
+      <stop offset="100%" stop-color="#8EE1EA"/>
+    </linearGradient>
+    <linearGradient id="gCoralPink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#F5A294"/>
+      <stop offset="100%" stop-color="#D0614F"/>
+    </linearGradient>
+    <linearGradient id="gCoralTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#84D3C6"/>
+      <stop offset="100%" stop-color="#2E9C8B"/>
+    </linearGradient>
+    <linearGradient id="gWavePink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#F4A99C"/>
+      <stop offset="100%" stop-color="#D87060"/>
+    </linearGradient>
+    <linearGradient id="gWaveTeal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#8ED4C8"/>
+      <stop offset="100%" stop-color="#3FAB9A"/>
+    </linearGradient>
+    <linearGradient id="gMic" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="55%"  stop-color="#F4F6F5"/>
+      <stop offset="100%" stop-color="#D7DBDA"/>
+    </linearGradient>
+
+    <clipPath id="squircle">
+      <rect x="100" y="100" width="824" height="824" rx="185" ry="185"/>
+    </clipPath>
+
+    <!--
+      ELEMENT · coral finger
+      Drawn at origin, pointing straight up (-y). ~150 tall, ~26 wide —
+      slimmer than before so separate fingers read as distinct branches.
+    -->
+    <path id="coralFinger"
+          d="M -10 0
+             C -12 -40, -14 -82, -15 -120
+             C -16 -138, -9 -144, -4 -138
+             C -1 -134, 1 -134, 4 -138
+             C 9 -144, 16 -138, 15 -120
+             C 14 -82, 12 -40, 10 0
+             Z"/>
+
+    <!--
+      ELEMENT · microphone (white)
+      Origin = capsule center; draws the full mic including U-holder,
+      stem, and flared base.
+    -->
+    <g id="mic">
+      <!-- capsule body -->
+      <rect x="-112" y="-182" width="224" height="380" rx="112" ry="112"
+            fill="url(#gMic)"/>
+      <!-- grille lines -->
+      <g stroke="#1E5B8A" stroke-width="10" stroke-linecap="round" opacity="0.32">
+        <line x1="-74" y1="-110" x2="74" y2="-110"/>
+        <line x1="-74" y1="-60"  x2="74" y2="-60"/>
+        <line x1="-74" y1="-10"  x2="74" y2="-10"/>
+        <line x1="-74" y1="40"   x2="74" y2="40"/>
+        <line x1="-74" y1="90"   x2="74" y2="90"/>
+      </g>
+      <!-- U-holder -->
+      <path d="M -166 88 C -166 236, -60 310, 0 310 C 60 310, 166 236, 166 88"
+            fill="none" stroke="url(#gMic)" stroke-width="24"
+            stroke-linecap="round"/>
+      <!-- stem -->
+      <rect x="-12" y="310" width="24" height="78" fill="url(#gMic)"/>
+      <!-- flared base -->
+      <path d="M -96 408
+               C -96 388, -64 378, 0 378
+               C 64 378, 96 388, 96 408
+               L 96 420 L -96 420 Z"
+            fill="url(#gMic)"/>
+    </g>
+
+    <!--
+      ELEMENT · speech bubble (outlined)
+    -->
+    <g id="speechBubble">
+      <rect x="0" y="0" width="220" height="150" rx="26" ry="26"
+            fill="#FFFFFF" fill-opacity="0.04"
+            stroke="#5FC7D6" stroke-width="9"/>
+      <path d="M 38 142 L 38 186 L 80 150 Z"
+            fill="#FFFFFF" fill-opacity="0.04"/>
+      <path d="M 38 142 L 38 186 L 80 150"
+            fill="none" stroke="#5FC7D6" stroke-width="9"
+            stroke-linejoin="round" stroke-linecap="round"/>
+      <g stroke="#5FC7D6" stroke-width="10" stroke-linecap="round">
+        <line x1="34"  y1="52"  x2="186" y2="52"/>
+        <line x1="34"  y1="86"  x2="186" y2="86"/>
+        <line x1="34"  y1="120" x2="144" y2="120"/>
+      </g>
+    </g>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <!-- 1. Background -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#gSea)"/>
+
+    <!-- 2. Waveform bars — explicit rects so height is concrete -->
+    <g fill="url(#gWavePink)">
+      <rect x="172" y="540" width="28" height="80"  rx="14"/>
+      <rect x="216" y="500" width="28" height="160" rx="14"/>
+      <rect x="260" y="460" width="28" height="240" rx="14"/>
+      <rect x="304" y="500" width="28" height="160" rx="14"/>
+      <rect x="348" y="540" width="28" height="80"  rx="14"/>
+    </g>
+    <g fill="url(#gWaveTeal)">
+      <rect x="648" y="540" width="28" height="80"  rx="14"/>
+      <rect x="692" y="500" width="28" height="160" rx="14"/>
+      <rect x="736" y="460" width="28" height="240" rx="14"/>
+      <rect x="780" y="500" width="28" height="160" rx="14"/>
+      <rect x="824" y="540" width="28" height="80"  rx="14"/>
+    </g>
+
+    <!-- 3. Arc -->
+    <path d="M 310 400 Q 512 216, 720 400"
+          fill="none" stroke="url(#gArc)"
+          stroke-width="22" stroke-linecap="round"/>
+
+    <!-- 3. Bubbles -->
+    <circle cx="290" cy="420" r="12" fill="#B3E4EE"/>
+    <circle cx="276" cy="458" r="7"  fill="#9FD4E0"/>
+    <circle cx="266" cy="490" r="5"  fill="#CFEBF1" opacity="0.85"/>
+    <circle cx="308" cy="380" r="6"  fill="#CFEBF1" opacity="0.85"/>
+
+    <!-- 4. Speech bubble -->
+    <use href="#speechBubble" x="688" y="260"/>
+
+    <!--
+      5. Coral (left, pink)
+      6 distinct fingers fan from a single anchor just to the left of the
+      mic stand. Outer fingers longest; inner sprouts shorter and tucked
+      in. Rotations in degrees off vertical.
+    -->
+    <g fill="url(#gCoralPink)" transform="translate(430 895)">
+      <!-- main fan -->
+      <g transform="rotate(-18) scale(1.95)"><use href="#coralFinger"/></g>
+      <g transform="rotate(-40) scale(2.05)"><use href="#coralFinger"/></g>
+      <g transform="rotate(-62) scale(1.75)"><use href="#coralFinger"/></g>
+      <g transform="rotate(-82) scale(1.45)"><use href="#coralFinger"/></g>
+      <!-- inner sprouts between the main fingers -->
+      <g transform="rotate(-30) scale(1.40)"><use href="#coralFinger"/></g>
+      <g transform="rotate(-52) scale(1.35)"><use href="#coralFinger"/></g>
+      <g transform="rotate(-72) scale(1.10)"><use href="#coralFinger"/></g>
+    </g>
+
+    <!-- 5. Coral (right, teal) — mirror -->
+    <g fill="url(#gCoralTeal)" transform="translate(594 895)">
+      <g transform="rotate(18) scale(1.95)"><use href="#coralFinger"/></g>
+      <g transform="rotate(40) scale(2.05)"><use href="#coralFinger"/></g>
+      <g transform="rotate(62) scale(1.75)"><use href="#coralFinger"/></g>
+      <g transform="rotate(82) scale(1.45)"><use href="#coralFinger"/></g>
+      <g transform="rotate(30) scale(1.40)"><use href="#coralFinger"/></g>
+      <g transform="rotate(52) scale(1.35)"><use href="#coralFinger"/></g>
+      <g transform="rotate(72) scale(1.10)"><use href="#coralFinger"/></g>
+    </g>
+
+    <!-- 6. Microphone (front) -->
+    <use href="#mic" x="512" y="512"/>
+  </g>
+
+  <!-- inner edge stroke -->
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" ry="184.5"
+        fill="none" stroke="#03182A" stroke-opacity="0.55" stroke-width="1"/>
+</svg>
