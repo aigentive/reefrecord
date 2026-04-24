@@ -252,7 +252,11 @@ impl GeminiClient {
         let parts = vec![json!({ "text": prompt }), audio_value];
         let payload = json!({
             "contents": [{ "parts": parts }],
-            "generationConfig": { "temperature": 0.1 }
+            "generationConfig": {
+                "temperature": 0.0,
+                "topP": 1.0,
+                "candidateCount": 1
+            }
         });
 
         let mut attempts: u32 = 0;
