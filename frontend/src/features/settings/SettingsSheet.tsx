@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { Settings } from "../../api/types";
 import { saveSettings } from "../../api/bridge";
@@ -31,6 +31,16 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
       setSaving(false);
     }
   }
+
+  // Auto-dismiss after a successful save so the user gets visible confirmation
+  // before the sheet closes itself.
+  useEffect(() => {
+    if (!saved || err) return;
+    const t = window.setTimeout(() => {
+      onClose();
+    }, 1800);
+    return () => window.clearTimeout(t);
+  }, [saved, err, onClose]);
 
   function set<K extends keyof Settings>(k: K, v: Settings[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
