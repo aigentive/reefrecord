@@ -74,6 +74,8 @@ pub async fn transcribe_session(
         fallback_model: settings.gemini_fallback_model.clone(),
         chunk_minutes: settings.chunk_minutes,
         language_hint: settings.language_hint.clone(),
+        include_speaker_labels: settings.include_speaker_labels,
+        include_timestamps: settings.include_timestamps,
     };
     let transcript_path = wav_path.with_file_name(format!(
         "{}_gemini.txt",

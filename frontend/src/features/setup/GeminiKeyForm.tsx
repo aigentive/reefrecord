@@ -20,6 +20,7 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
   const [msg, setMsg] = useState<{ kind: "success" | "error" | "info"; text: string } | null>(null);
 
   const hasKey = status?.gemini.state === "ready" || status?.gemini.state === "warning";
+  const canValidate = hasKey || key.trim().length > 0;
 
   async function doSave() {
     if (!key.trim()) {
@@ -48,12 +49,15 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
     setValidating(true);
     setMsg(null);
     try {
-      const result = await validateGeminiKey();
+      const typed = key.trim();
+      const result = await validateGeminiKey(typed || undefined);
       setMsg({
         kind: result.state === "ready" ? "success" : "error",
         text: result.detail || "Validation complete.",
       });
-      await onChanged();
+      // Refresh app status only when we validated the stored key; a typed-but-
+      // unsaved check doesn't change persisted state.
+      if (!typed) await onChanged();
     } catch (e) {
       setMsg({ kind: "error", text: String(e) });
     } finally {
@@ -79,8 +83,9 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
   return (
     <div className="inline-setup-body">
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-        Stored in the macOS keychain. The app never writes the key to .env,
-        logs, or settings JSON.
+        Stored locally as an AES-256-GCM encrypted file under the app config
+        dir. Key is derived from your machine identifier. Never written to
+        .env, logs, or settings JSON.
       </p>
 
       <div className="field">
@@ -94,7 +99,7 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
             type={reveal ? "text" : "password"}
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            placeholder="AIza…"
+            placeholder="AIzaSy…"
             autoComplete="off"
             spellCheck={false}
           />
@@ -121,8 +126,15 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
         <button
           type="button"
           className="btn"
-          disabled={validating || !hasKey}
+          disabled={validating || !canValidate}
           onClick={doValidate}
+          title={
+            key.trim()
+              ? "Validate the typed key without saving"
+              : hasKey
+              ? "Validate the saved key"
+              : "Paste a key first"
+          }
         >
           <Check size={14} />
           {validating ? "Validating…" : "Validate"}

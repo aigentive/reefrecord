@@ -109,15 +109,16 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
         }
     };
 
-    // Gemini key presence
-    let gemini_state = if secrets::has_gemini_key() {
-        let cached = state.gemini_last_validation.read().await.clone();
-        match cached {
-            Some(v) => v,
-            None => ProviderStatusDto::ready("Key saved. Press Validate to test."),
-        }
-    } else {
-        ProviderStatusDto::missing("Paste a Gemini API key to enable transcription.")
+    // Gemini key presence. Key lives in an AES-256-GCM encrypted file under
+    // the app config dir; the cached validation status is authoritative when
+    // set.
+    let cached_gemini = state.gemini_last_validation.read().await.clone();
+    let key_present = secrets::has_gemini_key();
+    let gemini_state = match (key_present, cached_gemini) {
+        (_, Some(v)) if v.state == "ready" || v.state == "warning" => v,
+        (true, Some(v)) => v,
+        (true, None) => ProviderStatusDto::ready("Key saved. Press Validate to test."),
+        (false, _) => ProviderStatusDto::missing("Paste a Gemini API key to enable transcription."),
     };
 
     // Sessions folder

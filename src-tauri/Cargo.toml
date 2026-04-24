@@ -28,11 +28,13 @@ cpal = "0.15"
 hound = "3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
 base64 = "0.22"
-keyring = "3"
 which = "7"
 tempfile = "3"
 once_cell = "1"
 uuid = { version = "1", features = ["v4"] }
+aes-gcm = "0.10"
+sha2 = "0.10"
+rand = "0.8"
 
 [profile.release]
 lto = true

@@ -17,6 +17,8 @@ pub struct Settings {
     pub gemini_fallback_model: String,
     pub chunk_minutes: u32,
     pub language_hint: String,
+    pub include_speaker_labels: bool,
+    pub include_timestamps: bool,
     pub github_sync_enabled: bool,
     pub github_repo_url: String,
     pub github_target_folder: String,
@@ -34,6 +36,8 @@ impl Default for Settings {
             gemini_fallback_model: "gemini-2.5-flash".to_string(),
             chunk_minutes: 15,
             language_hint: "Romanian with possible English".to_string(),
+            include_speaker_labels: true,
+            include_timestamps: true,
             github_sync_enabled: false,
             github_repo_url: String::new(),
             github_target_folder: "sessions".to_string(),
@@ -53,6 +57,8 @@ pub struct SettingsInput {
     pub gemini_fallback_model: Option<String>,
     pub chunk_minutes: Option<u32>,
     pub language_hint: Option<String>,
+    pub include_speaker_labels: Option<bool>,
+    pub include_timestamps: Option<bool>,
     pub github_sync_enabled: Option<bool>,
     pub github_repo_url: Option<String>,
     pub github_target_folder: Option<String>,
@@ -125,6 +131,12 @@ impl SettingsStore {
         }
         if let Some(v) = input.language_hint {
             current.language_hint = v;
+        }
+        if let Some(v) = input.include_speaker_labels {
+            current.include_speaker_labels = v;
+        }
+        if let Some(v) = input.include_timestamps {
+            current.include_timestamps = v;
         }
         if let Some(v) = input.github_sync_enabled {
             current.github_sync_enabled = v;

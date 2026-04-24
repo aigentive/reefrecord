@@ -539,6 +539,25 @@ a:hover {
   color: var(--muted);
 }
 
+.session-row .btn-icon {
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+}
+
+.session-row .btn-icon:focus-visible {
+  outline-offset: 1px;
+}
+
+@keyframes reef-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: reef-spin 1s linear infinite;
+}
+
 /* Sheet / dialog */
 .sheet-backdrop {
   position: fixed;

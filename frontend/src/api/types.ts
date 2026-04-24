@@ -33,6 +33,8 @@ export type Settings = {
   geminiFallbackModel: string;
   chunkMinutes: number;
   languageHint: string;
+  includeSpeakerLabels: boolean;
+  includeTimestamps: boolean;
   githubSyncEnabled: boolean;
   githubRepoUrl: string;
   githubTargetFolder: string;

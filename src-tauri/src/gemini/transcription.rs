@@ -14,6 +14,8 @@ pub struct TranscriptionJob {
     pub fallback_model: String,
     pub chunk_minutes: u32,
     pub language_hint: String,
+    pub include_speaker_labels: bool,
+    pub include_timestamps: bool,
 }
 
 pub async fn transcribe(
@@ -35,7 +37,12 @@ pub async fn transcribe(
             offset_s,
             "transcribing chunk"
         );
-        let prompt = build_prompt(*offset_s, &job.language_hint);
+        let prompt = build_prompt(
+            *offset_s,
+            &job.language_hint,
+            job.include_speaker_labels,
+            job.include_timestamps,
+        );
         let text = transcribe_chunk(
             client,
             chunk_path,
@@ -84,9 +91,14 @@ async fn transcribe_chunk(
     }
 }
 
-pub fn build_prompt(offset_seconds: u64, language_hint: &str) -> String {
+pub fn build_prompt(
+    offset_seconds: u64,
+    language_hint: &str,
+    include_speaker_labels: bool,
+    include_timestamps: bool,
+) -> String {
     let mut out = String::new();
-    if offset_seconds > 0 {
+    if offset_seconds > 0 && include_timestamps {
         let mm = offset_seconds / 60;
         let ss = offset_seconds % 60;
         out.push_str(&format!(
@@ -96,11 +108,36 @@ pub fn build_prompt(offset_seconds: u64, language_hint: &str) -> String {
     out.push_str("Transcribe this audio verbatim. Do not summarize or paraphrase.\n");
     if !language_hint.trim().is_empty() {
         out.push_str(&format!(
-            "The conversation is primarily in {language_hint}; preserve the original language as spoken.\n"
+            "The audio is primarily in {language_hint}; preserve the original language as spoken.\n"
         ));
     }
-    out.push_str("Identify and label different speakers as [Speaker 1], [Speaker 2], etc.\n");
-    out.push_str("Include timestamps in MM:SS format at each speaker change.\n");
+    match (include_speaker_labels, include_timestamps) {
+        (true, true) => {
+            out.push_str(
+                "Identify and label different speakers as [Speaker 1], [Speaker 2], etc.\n",
+            );
+            out.push_str(
+                "Include timestamps in [MM:SS] format at each speaker change.\n",
+            );
+        }
+        (true, false) => {
+            out.push_str(
+                "Identify and label different speakers as [Speaker 1], [Speaker 2], etc.\n",
+            );
+            out.push_str("Do not include timestamps.\n");
+        }
+        (false, true) => {
+            out.push_str("Do not label speakers.\n");
+            out.push_str(
+                "Include timestamps in [MM:SS] format at natural pauses or roughly every minute.\n",
+            );
+        }
+        (false, false) => {
+            out.push_str(
+                "Do not label speakers. Do not include timestamps. Produce clean flowing text only.\n",
+            );
+        }
+    }
     out.push_str("Output only the transcription, nothing else.");
     out
 }

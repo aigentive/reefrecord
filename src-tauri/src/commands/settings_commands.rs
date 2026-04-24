@@ -55,17 +55,28 @@ pub async fn delete_gemini_key(state: State<'_, AppState>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn validate_gemini_key(state: State<'_, AppState>) -> AppResult<ProviderStatusDto> {
-    let key = secrets::read_gemini_key()?
-        .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?;
+pub async fn validate_gemini_key(
+    state: State<'_, AppState>,
+    key: Option<String>,
+) -> AppResult<ProviderStatusDto> {
     let settings = state.settings.get();
-    let client = GeminiClient::new(key)?;
+    let transient = matches!(&key, Some(k) if !k.trim().is_empty());
+    let effective = match key {
+        Some(k) if !k.trim().is_empty() => k.trim().to_string(),
+        _ => secrets::read_gemini_key()?
+            .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?,
+    };
+    let client = GeminiClient::new(effective)?;
     let status = match client.validate(&settings.gemini_model).await {
         Ok(msg) => ProviderStatusDto::ready(msg),
         Err(e) => ProviderStatusDto::warning(format!("Validation failed: {e}")),
     };
-    let mut cached = state.gemini_last_validation.write().await;
-    *cached = Some(status.clone());
+    // Only cache when we validated the stored key — a transient (typed-but-
+    // unsaved) check shouldn't overwrite the status shown for the saved key.
+    if !transient {
+        let mut cached = state.gemini_last_validation.write().await;
+        *cached = Some(status.clone());
+    }
     Ok(status)
 }
 

@@ -193,10 +193,34 @@ export function App() {
             />
           </div>
 
+        </section>
+
+        <aside className="app-main-right">
+          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, maxHeight: selectedSession ? "45%" : undefined, flex: selectedSession ? "0 0 auto" : 1 }}>
+            <div className="inline-setup-title">
+              <h3 style={{ margin: 0, fontSize: 14 }}>Sessions</h3>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {sessions.length} total
+              </span>
+            </div>
+            <SessionList
+              sessions={sessions}
+              selectedId={selectedSessionId}
+              onSelect={setSelectedSessionId}
+              onSessionUpdated={handleSessionUpdated}
+              githubSyncEnabled={settings?.githubSyncEnabled ?? false}
+            />
+          </div>
+
           {selectedSession && (
-            <div className="panel transcript-drawer">
+            <div
+              className="panel transcript-drawer"
+              style={{ flex: 1, minHeight: 0 }}
+            >
               <div className="inline-setup-title">
-                <h3>Transcript — {selectedSession.id}</h3>
+                <h3 style={{ margin: 0, fontSize: 14 }}>
+                  Transcript — {selectedSession.id}
+                </h3>
                 <button
                   type="button"
                   className="btn btn-ghost"
@@ -211,22 +235,6 @@ export function App() {
               />
             </div>
           )}
-        </section>
-
-        <aside className="app-main-right">
-          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0 }}>
-            <div className="inline-setup-title">
-              <h3 style={{ margin: 0, fontSize: 14 }}>Sessions</h3>
-              <span className="muted" style={{ fontSize: 12 }}>
-                {sessions.length} total
-              </span>
-            </div>
-            <SessionList
-              sessions={sessions}
-              selectedId={selectedSessionId}
-              onSelect={setSelectedSessionId}
-            />
-          </div>
         </aside>
       </main>
 

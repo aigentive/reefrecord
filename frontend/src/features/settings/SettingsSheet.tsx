@@ -149,6 +149,30 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                 onChange={(e) => set("languageHint", e.target.value)}
               />
             </div>
+
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={draft.includeSpeakerLabels}
+                onChange={(e) => set("includeSpeakerLabels", e.target.checked)}
+              />
+              <span>Label speakers as [Speaker 1], [Speaker 2]</span>
+            </label>
+            <div className="field-hint" style={{ marginLeft: 44, marginTop: -6 }}>
+              Turn off when recording yourself solo.
+            </div>
+
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={draft.includeTimestamps}
+                onChange={(e) => set("includeTimestamps", e.target.checked)}
+              />
+              <span>Include [MM:SS] timestamps</span>
+            </label>
+            <div className="field-hint" style={{ marginLeft: 44, marginTop: -6 }}>
+              Turn off for a clean flowing transcript.
+            </div>
           </section>
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>

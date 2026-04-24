@@ -37,8 +37,8 @@ export function deleteGeminiKey(): Promise<void> {
   return invoke("delete_gemini_key");
 }
 
-export function validateGeminiKey(): Promise<ProviderStatus> {
-  return invoke("validate_gemini_key");
+export function validateGeminiKey(key?: string): Promise<ProviderStatus> {
+  return invoke("validate_gemini_key", key ? { key } : {});
 }
 
 export function selectSessionsFolder(): Promise<string | null> {

@@ -12,9 +12,6 @@ pub enum AppError {
     #[error("serialization error: {0}")]
     Serde(#[from] serde_json::Error),
 
-    #[error("keychain error: {0}")]
-    Keychain(String),
-
     #[error("gemini error: {0}")]
     Gemini(String),
 
@@ -51,11 +48,5 @@ pub type AppResult<T> = Result<T, AppError>;
 impl From<reqwest::Error> for AppError {
     fn from(e: reqwest::Error) -> Self {
         AppError::Http(e.to_string())
-    }
-}
-
-impl From<keyring::Error> for AppError {
-    fn from(e: keyring::Error) -> Self {
-        AppError::Keychain(e.to_string())
     }
 }

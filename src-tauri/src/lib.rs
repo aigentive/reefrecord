@@ -39,6 +39,7 @@ pub fn run() {
         .setup(|app| {
             let config_dir = settings::resolve_config_dir(app.handle())
                 .expect("failed to resolve config directory");
+            crate::services::secrets::set_config_dir(config_dir.clone());
             let settings_store = Arc::new(SettingsStore::load_or_default(&config_dir));
             let session_store = Arc::new(SessionStore::new(settings_store.clone()));
             let recording_service = Arc::new(RecordingService::new(session_store.clone(), settings_store.clone()));
