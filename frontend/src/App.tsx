@@ -6,7 +6,7 @@ import { RecorderPanel } from "./features/recorder/RecorderPanel";
 import { SessionList } from "./features/sessions/SessionList";
 import { TranscriptDrawer } from "./features/sessions/TranscriptDrawer";
 import { SettingsSheet } from "./features/settings/SettingsSheet";
-import { Archive, Trash2 } from "lucide-react";
+import { Archive, Trash2, X } from "lucide-react";
 import type { AppStatus, SessionSummary, Settings } from "./api/types";
 import {
   clearAllWavs,
@@ -232,17 +232,36 @@ export function App() {
           </div>
 
           {selectedSession && (
-            <div className="panel transcript-drawer">
-              <div className="inline-setup-title">
-                <h3 style={{ margin: 0, fontSize: 14 }}>
-                  Transcript — {selectedSession.id}
-                </h3>
-              </div>
-              <TranscriptDrawer
-                session={selectedSession}
-                onSessionUpdated={handleSessionUpdated}
+            <>
+              <div
+                className="transcript-scrim"
+                onClick={() => setSelectedSessionId(null)}
+                aria-hidden
               />
-            </div>
+              <div
+                className="panel transcript-drawer"
+                role="dialog"
+                aria-label={`Transcript for ${selectedSession.id}`}
+              >
+                <div className="inline-setup-title">
+                  <h3 style={{ margin: 0, fontSize: 14 }}>
+                    Transcript — {selectedSession.id}
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn btn-icon transcript-drawer-close"
+                    aria-label="Close transcript"
+                    onClick={() => setSelectedSessionId(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <TranscriptDrawer
+                  session={selectedSession}
+                  onSessionUpdated={handleSessionUpdated}
+                />
+              </div>
+            </>
           )}
         </section>
 
