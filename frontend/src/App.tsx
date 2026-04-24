@@ -272,19 +272,16 @@ export function App() {
 
         <aside className="app-main-right">
           <div
-            className="panel"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              flex: 1,
-              minHeight: 0,
-            }}
+            className="panel panel-list"
+            style={{ flex: 1, minHeight: 0 }}
           >
-            <div className="inline-setup-title">
-              <h3 style={{ margin: 0, fontSize: 14 }}>Sessions</h3>
-              <div className="row" style={{ gap: 4 }}>
-                <span className="muted" style={{ fontSize: 12, marginRight: 6 }}>
+            <div className="panel-list-head">
+              <h3>Sessions</h3>
+              <div className="row" style={{ gap: 2 }}>
+                <span
+                  className="muted"
+                  style={{ fontSize: 12, marginRight: 4 }}
+                >
                   {sessions.length} total
                 </span>
                 <button
@@ -295,7 +292,7 @@ export function App() {
                   disabled={sessions.every((s) => !s.wavPath)}
                   onClick={doClearAllWavs}
                 >
-                  <Archive size={14} />
+                  <Archive size={13} />
                 </button>
                 <button
                   type="button"
@@ -305,7 +302,7 @@ export function App() {
                   disabled={sessions.length === 0}
                   onClick={doDeleteAllSessions}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>
