@@ -76,7 +76,11 @@ pub enum SyncOutcome {
     Skipped,
 }
 
-pub fn push_session(settings: &Settings, session: &SessionSummary) -> AppResult<SyncOutcome> {
+pub fn push_session(
+    settings: &Settings,
+    session: &SessionSummary,
+    sessions_dir: &Path,
+) -> AppResult<SyncOutcome> {
     if !settings.github_sync_enabled {
         return Err(AppError::Invalid("GitHub sync is disabled.".into()));
     }
@@ -112,14 +116,16 @@ pub fn push_session(settings: &Settings, session: &SessionSummary) -> AppResult<
     std::fs::create_dir_all(&target)
         .map_err(|e| AppError::Git(format!("cannot create target folder: {e}")))?;
 
-    let wav_src = Path::new(&session.wav_path);
-    if wav_src.exists() {
-        let dst = target.join(
-            wav_src
-                .file_name()
-                .unwrap_or_else(|| std::ffi::OsStr::new("session.wav")),
-        );
-        std::fs::copy(wav_src, &dst).map_err(|e| AppError::Git(format!("copy wav: {e}")))?;
+    if let Some(wav) = session.wav_path.as_deref() {
+        let wav_src = Path::new(wav);
+        if wav_src.exists() {
+            let dst = target.join(
+                wav_src
+                    .file_name()
+                    .unwrap_or_else(|| std::ffi::OsStr::new("session.wav")),
+            );
+            std::fs::copy(wav_src, &dst).map_err(|e| AppError::Git(format!("copy wav: {e}")))?;
+        }
     }
     if let Some(tp) = &session.transcript_path {
         let src = Path::new(tp);
@@ -128,7 +134,7 @@ pub fn push_session(settings: &Settings, session: &SessionSummary) -> AppResult<
             std::fs::copy(src, &dst).map_err(|e| AppError::Git(format!("copy transcript: {e}")))?;
         }
     }
-    let meta_path = session.metadata_path();
+    let meta_path = session.metadata_path(sessions_dir);
     if meta_path.exists() {
         let dst = target.join(meta_path.file_name().unwrap());
         std::fs::copy(&meta_path, &dst).map_err(|e| AppError::Git(format!("copy metadata: {e}")))?;

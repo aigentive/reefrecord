@@ -534,6 +534,16 @@ a:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.session-row-preview {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .session-row-meta {
   display: flex;
   gap: 10px;

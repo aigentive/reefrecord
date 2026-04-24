@@ -144,7 +144,7 @@ impl RecordingService {
             id: session_id,
             started_at: started_at_utc,
             duration_seconds,
-            wav_path: wav_path.to_string_lossy().to_string(),
+            wav_path: Some(wav_path.to_string_lossy().to_string()),
             transcript_path: None,
             mic_device_name: Some(mic_name),
             system_device_name: system_name,
@@ -157,6 +157,7 @@ impl RecordingService {
             transcription_model: None,
             sync_status,
             sync_error: None,
+            transcript_preview: None,
         };
         self.sessions.upsert(summary.clone())?;
         tracing::info!(session = %summary.id, seconds = duration_seconds, "recording saved");

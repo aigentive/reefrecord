@@ -77,8 +77,9 @@ export type SessionSummary = {
   id: string;
   startedAt: string;
   durationSeconds: number;
-  wavPath: string;
+  wavPath: string | null;
   transcriptPath: string | null;
+  transcriptPreview?: string;
   micDeviceName: string | null;
   systemDeviceName: string | null;
   transcriptionStatus: TranscriptionStatus;

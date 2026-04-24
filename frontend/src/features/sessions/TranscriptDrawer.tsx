@@ -115,7 +115,12 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
         <button
           type="button"
           className="btn"
-          onClick={() => revealPath(session.wavPath).catch((e) => setMsg(String(e)))}
+          disabled={!session.wavPath}
+          title={session.wavPath ? undefined : "WAV has been cleared"}
+          onClick={() =>
+            session.wavPath &&
+            revealPath(session.wavPath).catch((e) => setMsg(String(e)))
+          }
         >
           <ExternalLink size={14} />
           Reveal WAV

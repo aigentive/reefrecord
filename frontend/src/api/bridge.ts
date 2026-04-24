@@ -88,3 +88,19 @@ export function syncSession(sessionId: string): Promise<SyncResult> {
 export function validateGitSyncSettings(): Promise<GitSyncStatus> {
   return invoke("validate_git_sync_settings");
 }
+
+export function deleteSession(sessionId: string): Promise<void> {
+  return invoke("delete_session", { sessionId });
+}
+
+export function clearSessionWav(sessionId: string): Promise<SessionSummary> {
+  return invoke("clear_session_wav", { sessionId });
+}
+
+export function deleteAllSessions(): Promise<number> {
+  return invoke("delete_all_sessions");
+}
+
+export function clearAllWavs(): Promise<number> {
+  return invoke("clear_all_wavs");
+}

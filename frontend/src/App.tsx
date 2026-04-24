@@ -6,8 +6,11 @@ import { RecorderPanel } from "./features/recorder/RecorderPanel";
 import { SessionList } from "./features/sessions/SessionList";
 import { TranscriptDrawer } from "./features/sessions/TranscriptDrawer";
 import { SettingsSheet } from "./features/settings/SettingsSheet";
+import { Archive, Trash2 } from "lucide-react";
 import type { AppStatus, SessionSummary, Settings } from "./api/types";
 import {
+  clearAllWavs,
+  deleteAllSessions,
   getAppStatus,
   getSettings,
   listSessions,
@@ -133,6 +136,41 @@ export function App() {
     setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }, []);
 
+  const handleSessionRemoved = useCallback((id: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    setSelectedSessionId((prev) => (prev === id ? null : prev));
+  }, []);
+
+  async function doDeleteAllSessions() {
+    if (sessions.length === 0) return;
+    const ok = window.confirm(
+      `Delete all ${sessions.length} sessions?\n\nRemoves every WAV, transcript, and metadata file. This cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await deleteAllSessions();
+      setSessions([]);
+      setSelectedSessionId(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function doClearAllWavs() {
+    const withWav = sessions.filter((s) => s.wavPath).length;
+    if (withWav === 0) return;
+    const ok = window.confirm(
+      `Clear WAV from ${withWav} session${withWav === 1 ? "" : "s"}?\n\nKeeps transcripts and metadata. Retranscription won't be possible after this.`
+    );
+    if (!ok) return;
+    try {
+      await clearAllWavs();
+      await refreshSessions();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   return (
     <div className="app">
       <header className="app-top">
@@ -228,15 +266,38 @@ export function App() {
           >
             <div className="inline-setup-title">
               <h3 style={{ margin: 0, fontSize: 14 }}>Sessions</h3>
-              <span className="muted" style={{ fontSize: 12 }}>
-                {sessions.length} total
-              </span>
+              <div className="row" style={{ gap: 4 }}>
+                <span className="muted" style={{ fontSize: 12, marginRight: 6 }}>
+                  {sessions.length} total
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  aria-label="Clear all WAVs"
+                  title="Clear WAV for every session (keeps transcripts)"
+                  disabled={sessions.every((s) => !s.wavPath)}
+                  onClick={doClearAllWavs}
+                >
+                  <Archive size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-icon btn-danger"
+                  aria-label="Delete all sessions"
+                  title="Delete all sessions (WAV + transcript + metadata)"
+                  disabled={sessions.length === 0}
+                  onClick={doDeleteAllSessions}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
             <SessionList
               sessions={sessions}
               selectedId={selectedSessionId}
               onSelect={setSelectedSessionId}
               onSessionUpdated={handleSessionUpdated}
+              onSessionRemoved={handleSessionRemoved}
               githubSyncEnabled={settings?.githubSyncEnabled ?? false}
             />
           </div>

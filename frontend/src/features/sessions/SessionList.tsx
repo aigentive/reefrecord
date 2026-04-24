@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { RefreshCw, Upload } from "lucide-react";
+import { Archive, RefreshCw, Trash2, Upload } from "lucide-react";
 import type { SessionSummary } from "../../api/types";
-import { syncSession, transcribeSession } from "../../api/bridge";
+import {
+  clearSessionWav,
+  deleteSession,
+  syncSession,
+  transcribeSession,
+} from "../../api/bridge";
 
 type Props = {
   sessions: SessionSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onSessionUpdated: (session: SessionSummary) => void;
+  onSessionRemoved: (id: string) => void;
   githubSyncEnabled: boolean;
 };
 
@@ -16,6 +22,7 @@ export function SessionList({
   selectedId,
   onSelect,
   onSessionUpdated,
+  onSessionRemoved,
   githubSyncEnabled,
 }: Props) {
   if (sessions.length === 0) {
@@ -30,6 +37,7 @@ export function SessionList({
           selected={s.id === selectedId}
           onSelect={onSelect}
           onSessionUpdated={onSessionUpdated}
+          onSessionRemoved={onSessionRemoved}
           githubSyncEnabled={githubSyncEnabled}
         />
       ))}
@@ -42,6 +50,7 @@ type RowProps = {
   selected: boolean;
   onSelect: (id: string) => void;
   onSessionUpdated: (session: SessionSummary) => void;
+  onSessionRemoved: (id: string) => void;
   githubSyncEnabled: boolean;
 };
 
@@ -50,19 +59,25 @@ function SessionRow({
   selected,
   onSelect,
   onSessionUpdated,
+  onSessionRemoved,
   githubSyncEnabled,
 }: RowProps) {
   const [retrying, setRetrying] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [busyAction, setBusyAction] = useState<null | "delete" | "clear-wav">(
+    null
+  );
 
   const transStatus = session.transcriptionStatus;
   const syncStatus = session.syncStatus;
   const transcriptBusy = transStatus === "transcribing" || retrying;
+  const hasWav = !!session.wavPath;
   const canRetranscribe =
-    transStatus === "pending" ||
-    transStatus === "failed" ||
-    transStatus === "complete" ||
-    transStatus === "not_started";
+    hasWav &&
+    (transStatus === "pending" ||
+      transStatus === "failed" ||
+      transStatus === "complete" ||
+      transStatus === "not_started");
   const canSync = githubSyncEnabled && !syncing;
 
   async function doRetranscribe(e: React.MouseEvent) {
@@ -115,6 +130,41 @@ function SessionRow({
     }
   }
 
+  async function doDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    const ok = window.confirm(
+      `Delete ${session.id}?\n\nRemoves the WAV, transcript, and metadata. This cannot be undone.`
+    );
+    if (!ok) return;
+    setBusyAction("delete");
+    try {
+      await deleteSession(session.id);
+      onSessionRemoved(session.id);
+    } catch (err) {
+      window.alert(`Delete failed: ${String(err)}`);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function doClearWav(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!hasWav) return;
+    const ok = window.confirm(
+      `Clear the WAV from ${session.id}?\n\nKeeps the transcript. You won't be able to retranscribe afterwards.`
+    );
+    if (!ok) return;
+    setBusyAction("clear-wav");
+    try {
+      const next = await clearSessionWav(session.id);
+      onSessionUpdated(next);
+    } catch (err) {
+      window.alert(`Clear WAV failed: ${String(err)}`);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <div
       role="listitem"
@@ -133,6 +183,9 @@ function SessionRow({
         <span className="session-row-id">{session.id}</span>
         <span className="session-row-time">{formatDate(session.startedAt)}</span>
       </div>
+      {session.transcriptPreview && (
+        <div className="session-row-preview">{session.transcriptPreview}</div>
+      )}
       <div className="session-row-meta">
         <span>{formatSeconds(session.durationSeconds)}</span>
         <span className="session-row-tag" data-state={transStatus}>
@@ -208,6 +261,30 @@ function SessionRow({
             <Upload size={13} />
           </button>
         )}
+        <button
+          type="button"
+          className="btn btn-icon"
+          aria-label="Clear WAV"
+          title={
+            hasWav
+              ? "Clear WAV (keeps transcript)"
+              : "WAV already cleared"
+          }
+          disabled={!hasWav || busyAction === "clear-wav"}
+          onClick={doClearWav}
+        >
+          <Archive size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-icon btn-danger"
+          aria-label="Delete session"
+          title="Delete session (WAV + transcript + metadata)"
+          disabled={busyAction === "delete"}
+          onClick={doDelete}
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
     </div>
   );

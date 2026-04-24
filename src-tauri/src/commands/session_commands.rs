@@ -62,6 +62,15 @@ pub async fn transcribe_session(
         .get(&session_id)
         .ok_or_else(|| AppError::NotFound(format!("session {session_id} not found")))?;
 
+    let wav_path = match summary.wav_path.clone() {
+        Some(p) if std::path::Path::new(&p).exists() => std::path::PathBuf::from(p),
+        _ => {
+            return Err(AppError::Invalid(
+                "WAV file is no longer on disk. Clear the session and re-record.".into(),
+            ));
+        }
+    };
+
     summary.transcription_status = TranscriptionStatus::Transcribing;
     summary.transcription_error = None;
     summary.transcription_prompt_tokens = None;
@@ -72,7 +81,6 @@ pub async fn transcribe_session(
     state.sessions.upsert(summary.clone())?;
 
     let client = GeminiClient::new(key)?;
-    let wav_path = std::path::PathBuf::from(&summary.wav_path);
     let job = TranscriptionJob {
         wav_path: wav_path.clone(),
         primary_model: settings.gemini_model.clone(),
@@ -166,10 +174,12 @@ pub async fn sync_session(
     summary.sync_error = None;
     state.sessions.upsert(summary.clone())?;
 
+    let sessions_dir = state.sessions.sessions_dir()?;
     let result = tokio::task::spawn_blocking({
         let settings = settings.clone();
         let session = summary.clone();
-        move || git_sync::push_session(&settings, &session)
+        let sessions_dir = sessions_dir.clone();
+        move || git_sync::push_session(&settings, &session, &sessions_dir)
     })
     .await
     .map_err(|e| AppError::Git(format!("join error: {e}")))?;
@@ -208,4 +218,27 @@ pub async fn sync_session(
 pub async fn validate_git_sync_settings(state: State<'_, AppState>) -> AppResult<GitSyncStatus> {
     let settings = state.settings.get();
     Ok(git_sync::validate(&settings))
+}
+
+#[tauri::command]
+pub async fn delete_session(state: State<'_, AppState>, session_id: String) -> AppResult<()> {
+    state.sessions.delete(&session_id)
+}
+
+#[tauri::command]
+pub async fn clear_session_wav(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> AppResult<SessionSummary> {
+    state.sessions.clear_wav(&session_id)
+}
+
+#[tauri::command]
+pub async fn delete_all_sessions(state: State<'_, AppState>) -> AppResult<usize> {
+    state.sessions.delete_all()
+}
+
+#[tauri::command]
+pub async fn clear_all_wavs(state: State<'_, AppState>) -> AppResult<usize> {
+    state.sessions.clear_all_wavs()
 }
