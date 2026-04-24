@@ -8,7 +8,6 @@ import type {
   Settings,
   SettingsInput,
   SyncResult,
-  TranscriptResult,
   GitSyncStatus,
   ProviderStatus,
 } from "./types";
@@ -73,7 +72,7 @@ export function stopRecording(sessionId: string): Promise<SessionSummary> {
   return invoke("stop_recording", { sessionId });
 }
 
-export function transcribeSession(sessionId: string): Promise<TranscriptResult> {
+export function transcribeSession(sessionId: string): Promise<SessionSummary> {
   return invoke("transcribe_session", { sessionId });
 }
 

@@ -99,12 +99,6 @@ export type RecordingInput = {
   systemAudioDeviceSelector: string | null;
 };
 
-export type TranscriptResult = {
-  sessionId: string;
-  transcriptPath: string;
-  status: TranscriptionStatus;
-};
-
 export type SyncResult = {
   sessionId: string;
   status: SyncStatus;

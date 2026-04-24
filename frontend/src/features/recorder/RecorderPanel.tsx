@@ -79,11 +79,7 @@ export function RecorderPanel({
       setPhase("transcribing");
       try {
         const result = await transcribeSession(sessionId);
-        onSessionUpdated({
-          ...summary,
-          transcriptPath: result.transcriptPath,
-          transcriptionStatus: result.status,
-        });
+        onSessionUpdated(result);
       } catch (e) {
         onSessionUpdated({
           ...summary,

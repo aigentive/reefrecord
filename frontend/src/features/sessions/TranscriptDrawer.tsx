@@ -59,12 +59,7 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
     setMsg(null);
     try {
       const r = await transcribeSession(session.id);
-      onSessionUpdated({
-        ...session,
-        transcriptPath: r.transcriptPath,
-        transcriptionStatus: r.status,
-        transcriptionError: undefined,
-      });
+      onSessionUpdated(r);
     } catch (e) {
       setMsg(String(e));
       onSessionUpdated({

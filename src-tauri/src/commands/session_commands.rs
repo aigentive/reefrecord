@@ -12,14 +12,6 @@ use crate::AppState;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TranscriptResult {
-    pub session_id: String,
-    pub transcript_path: String,
-    pub status: TranscriptionStatus,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SyncResult {
     pub session_id: String,
     pub status: SyncStatus,
@@ -53,7 +45,7 @@ pub async fn stop_recording(
 pub async fn transcribe_session(
     state: State<'_, AppState>,
     session_id: String,
-) -> AppResult<TranscriptResult> {
+) -> AppResult<SessionSummary> {
     let key = secrets::read_gemini_key()?
         .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?;
     let settings = state.settings.get();
@@ -112,11 +104,7 @@ pub async fn transcribe_session(
             summary.transcription_cost_usd = Some(usd);
             summary.transcription_model = Some(outcome.model_used);
             state.sessions.upsert(summary.clone())?;
-            Ok(TranscriptResult {
-                session_id: summary.id,
-                transcript_path: transcript_path.to_string_lossy().to_string(),
-                status: TranscriptionStatus::Complete,
-            })
+            Ok(summary)
         }
         Err(e) => {
             summary.transcription_status = TranscriptionStatus::Failed;

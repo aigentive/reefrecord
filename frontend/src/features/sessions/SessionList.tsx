@@ -89,14 +89,14 @@ function SessionRow({
         ...session,
         transcriptionStatus: "transcribing",
         transcriptionError: undefined,
+        transcriptionPromptTokens: undefined,
+        transcriptionOutputTokens: undefined,
+        transcriptionTotalTokens: undefined,
+        transcriptionCostUsd: undefined,
+        transcriptionModel: undefined,
       });
       const r = await transcribeSession(session.id);
-      onSessionUpdated({
-        ...session,
-        transcriptPath: r.transcriptPath,
-        transcriptionStatus: r.status,
-        transcriptionError: undefined,
-      });
+      onSessionUpdated(r);
     } catch (err) {
       onSessionUpdated({
         ...session,

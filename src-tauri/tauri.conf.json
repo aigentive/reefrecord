@@ -37,7 +37,8 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist"
     },
     "category": "Productivity",
     "shortDescription": "Record conversations and transcribe with Gemini.",
