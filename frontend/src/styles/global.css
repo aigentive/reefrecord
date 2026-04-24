@@ -490,52 +490,51 @@ a:hover {
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   overflow: auto;
   flex: 1;
   min-height: 0;
+  margin: 0 -16px;
+  border-top: 1px solid var(--border);
 }
 
 .session-row {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  padding: 12px 16px;
   background: var(--surface);
   cursor: pointer;
   position: relative;
-  transition: border-color 120ms ease, background 160ms ease,
-    box-shadow 160ms ease, transform 160ms ease;
+  border-bottom: 1px solid var(--border);
+  transition: background 160ms ease;
 }
 
 .session-row:hover {
-  border-color: var(--teal-300);
-  background: var(--teal-50);
-  box-shadow: var(--shadow-sm);
+  background: var(--paper-50);
 }
 
 .session-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-  border-color: var(--teal-400);
+  z-index: 1;
 }
 
 .session-row[data-selected="true"] {
-  border-color: var(--teal-500);
   background: var(--teal-50);
-  box-shadow: var(--shadow-md), inset 3px 0 0 0 var(--teal-500);
-  padding-left: 15px;
 }
 
 .session-row[data-selected="true"]:hover {
   background: var(--teal-100);
 }
 
-.session-row[data-selected="true"] .session-row-id,
-.session-row[data-selected="true"] .session-row-time {
-  color: var(--teal-900);
+.session-row[data-selected="true"] .session-row-id {
+  color: var(--teal-800);
+  font-weight: 600;
+}
+
+.session-row[data-selected="true"] .session-row-time,
+.session-row[data-selected="true"] .session-row-preview {
+  color: var(--teal-700);
 }
 
 .session-row-head {
