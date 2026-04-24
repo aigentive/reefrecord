@@ -87,7 +87,10 @@ impl SettingsStore {
     }
 
     pub fn get(&self) -> Settings {
-        self.inner.read().expect("settings poisoned").clone()
+        match self.inner.read() {
+            Ok(g) => g.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
     }
 
     pub fn path(&self) -> &Path {
@@ -95,7 +98,10 @@ impl SettingsStore {
     }
 
     pub fn update(&self, input: SettingsInput) -> AppResult<Settings> {
-        let mut current = self.inner.write().expect("settings poisoned");
+        let mut current = match self.inner.write() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         if let Some(v) = input.sessions_dir {
             current.sessions_dir = v;
         }
@@ -157,7 +163,10 @@ impl SettingsStore {
         }
         let text = serde_json::to_string_pretty(settings)?;
         let tmp = self.path.with_extension("json.tmp");
-        std::fs::write(&tmp, text)?;
+        let mut f = std::fs::File::create(&tmp)?;
+        std::io::Write::write_all(&mut f, text.as_bytes())?;
+        f.sync_all()?;
+        drop(f);
         std::fs::rename(&tmp, &self.path)?;
         Ok(())
     }

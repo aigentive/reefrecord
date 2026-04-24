@@ -151,7 +151,10 @@ impl SessionStore {
         let path = summary.metadata_path();
         let tmp = path.with_extension("json.tmp");
         let text = serde_json::to_string_pretty(summary)?;
-        std::fs::write(&tmp, text)?;
+        let mut f = std::fs::File::create(&tmp)?;
+        std::io::Write::write_all(&mut f, text.as_bytes())?;
+        f.sync_all()?;
+        drop(f);
         std::fs::rename(&tmp, &path)?;
         Ok(())
     }

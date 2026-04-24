@@ -1,87 +1,98 @@
-# Audio Recorder
+# Reef Recorder
 
-Records microphone + system audio and transcribes with Gemini Flash. Sessions (WAV + transcript) can be auto-pushed to a GitHub repo.
+Desktop app that records microphone (and optionally system audio via BlackHole), saves a WAV, transcribes with Gemini, and optionally syncs sessions to a GitHub repository — all configurable from a single window.
 
-## How It Works
+Built with [Tauri v2](https://tauri.app/), React + TypeScript, and Rust. No more `.env` editing or terminal.
 
-1. **Audio capture** — opens your microphone and (optionally) a BlackHole loopback device to capture system audio. Both streams are mixed into a single mono 16 kHz int16 buffer.
-2. **Gemini transcription** — after you stop recording, the saved WAV is sent to Gemini 2.5 Flash for verbatim transcription with speaker labels and timestamps. Long recordings are automatically split into chunks.
-3. **GitHub push** — session files (`.wav`, `_gemini.txt`) are committed and pushed to a configurable GitHub repo.
+## Features
+
+- **Setup in the app** — paste your Gemini API key, pick a local sessions folder, enable GitHub sync. No `.env`.
+- **Mic-only or mic + system audio** — system audio requires [BlackHole](https://github.com/ExistentialAudio/BlackHole) as a loopback input; without it you get mic-only.
+- **Gemini transcription** — runs after the recording stops. Handles long recordings by splitting into chunks, tries a fallback model on failure.
+- **GitHub sync** — uses your local `git` + `git-lfs` installs. Sessions go into a configured subfolder of the target repo.
+- **Safe secret storage** — the Gemini API key lives in the macOS Keychain, never in plain files or logs.
 
 ## Prerequisites
 
-- **Python 3.9+**
-- **PortAudio** — required by PyAudio
-  ```bash
-  brew install portaudio
-  ```
-- **BlackHole** (optional, for system audio capture)
-  ```bash
-  brew install --cask blackhole-2ch
-  ```
-  After installing, reboot, then create a **Multi-Output Device** in Audio MIDI Setup that combines BlackHole with your speakers. Set macOS output to that device while recording.
+- **macOS 13+** (system-audio capture is macOS-only in this MVP).
+- **Node.js 20+** and **npm**.
+- **Rust** (`rustup` toolchain). Stable channel.
+- **Tauri v2 prerequisites** — follow [https://tauri.app/start/prerequisites/](https://tauri.app/start/prerequisites/).
+- **git** and, if you enable WAV sync, **git-lfs**: `brew install git-lfs`.
+- Optional: **BlackHole 2ch** — `brew install --cask blackhole-2ch` (reboot after install).
 
-## Setup
+## Install
 
 ```bash
-# clone the repo
-git clone <repo-url> && cd reefrecord
-
-# create a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# install dependencies
-pip install pyaudio requests python-dotenv
+git clone <this-repo> reef-recorder
+cd reef-recorder
+cd frontend && npm install
 ```
 
-Create a `.env` file in the project root:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key             # required for transcription
-GH_SESSIONS_REPO=git@github.com:user/repo.git # optional — skip push if empty
-GH_SESSIONS_FOLDER=sessions                   # subfolder inside the repo (default: sessions)
-SYSTEM_AUDIO_DEVICE=                           # device name/index override (default: auto-detect BlackHole)
-MIC_DEVICE=                                    # mic name/index override (default: system default mic)
-```
-
-## Usage
+## Run (dev)
 
 ```bash
-python recorder.py
+cd frontend
+npx tauri dev
 ```
 
-You'll see a simple menu:
+The first launch opens the app window. The setup rail shows readiness chips for Mic, System Audio, Gemini, Folder, and GitHub. Missing required items auto-open their setup panel.
 
-```
-=== audio recorder ===
+## Build (release)
 
-[s]tart / [q]uit:
-```
-
-Press **s** to start a session. The recorder prints detected devices and begins recording:
-
-```
-  system audio: [4] BlackHole 2ch
-  microphone:   [1] MacBook Pro Microphone
-
-  recording → sessions/session_20260319_140000.wav
-  press enter to stop
+```bash
+cd /path/to/reef-recorder
+./frontend/node_modules/.bin/tauri build --no-bundle
 ```
 
-Press **Enter** to stop. The recorder saves the audio, transcribes it with Gemini, and optionally pushes to GitHub:
+Produces an unsigned macOS binary at `src-tauri/target/release/reef-recorder`.
 
-| File | Contents |
-|------|----------|
-| `session_<timestamp>.wav` | Raw audio recording (16 kHz mono) |
-| `session_<timestamp>_gemini.txt` | Gemini Flash transcript with speaker labels and timestamps |
+For a signed / notarized DMG, configure `tauri.conf.json` → `bundle.macOS.signingIdentity` and run `tauri build` without `--no-bundle`.
 
-## Environment Variables
+## Configuration
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GEMINI_API_KEY` | Yes | Google Gemini API key for transcription |
-| `GH_SESSIONS_REPO` | No | Git remote URL to push session files to |
-| `GH_SESSIONS_FOLDER` | No | Target folder in the repo (default: `sessions`) |
-| `SYSTEM_AUDIO_DEVICE` | No | Override system audio device by name or index |
-| `MIC_DEVICE` | No | Override microphone device by name or index |
+| Setting | Where | Default |
+|---|---|---|
+| Gemini API key | Setup rail → **Gemini** → Save key | keychain only |
+| Sessions folder | Setup rail → **Folder** or Settings → Audio | prompted on first launch |
+| Microphone device | Settings → Audio → Microphone selector | system default |
+| System audio device | Settings → Audio → System audio selector | first BlackHole match |
+| Gemini model | Settings → Gemini → Model | `gemini-3-flash-preview` |
+| Fallback model | Settings → Gemini → Fallback model | `gemini-2.5-flash` |
+| Chunk size | Settings → Gemini → Chunk minutes | 15 |
+| Language hint | Settings → Gemini → Language hint | `Romanian with possible English` |
+| GitHub sync | Setup rail → **GitHub** or Settings → GitHub sync | off |
+| Repo URL | Settings → GitHub sync → Repository URL | — |
+| Target folder | Settings → GitHub sync → Target folder | `sessions` |
+| Use Git LFS | Settings → GitHub sync → Use Git LFS for WAV files | on |
+
+Non-secret settings are stored in the OS app config dir:
+
+```
+~/Library/Application Support/com.aigentive.reefrecord/settings.json
+```
+
+## File layout
+
+```
+frontend/             Vite + React + TS (UI).
+src-tauri/            Tauri v2 Rust backend.
+.plans/               Phased product spec.
+recorder.py           Python reference (retained for parity checks — not run).
+CLAUDE.md             Dev guide (Claude Code).
+AGENTS.md             Dev guide (cross-provider).
+```
+
+See `CLAUDE.md` for conventions, Rust `Send/Sync` gotchas, and how commands flow between the frontend bridge (`frontend/src/api/bridge.ts`) and the Rust command modules (`src-tauri/src/commands/`).
+
+## Troubleshooting
+
+- **"BlackHole not detected — recording will be mic-only"** — install it via `brew install --cask blackhole-2ch`, reboot, and set macOS output to a Multi-Output Device containing BlackHole + your speakers.
+- **"BlackHole driver is installed but CoreAudio has not loaded it yet"** — reboot macOS.
+- **Microphone chip stays "denied"** — macOS → System Settings → Privacy & Security → Microphone → enable for Reef Recorder.
+- **GitHub sync fails with "authentication failed"** — your local `git` credentials aren't set up. Try an SSH remote (`git@github.com:...`) or configure the credential manager.
+- **Gemini validation "warning"** — the key is stored but the `/models` call returned a non-success. The recording path will still try the primary model, then fall back.
+
+## Spec
+
+`.plans/00-product-spec.md` through `.plans/05-polish-release.md` contain the frozen product spec. Read them before contributing feature changes.
