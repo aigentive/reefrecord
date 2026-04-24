@@ -111,7 +111,13 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
 
   return (
     <>
-      <div className="row">
+      <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+        {session.transcriptionStatus === "complete" && text && (
+          <button type="button" className="btn btn-primary" onClick={copy}>
+            <Copy size={14} />
+            Copy transcript
+          </button>
+        )}
         <button
           type="button"
           className="btn"
@@ -137,22 +143,15 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
             Reveal transcript
           </button>
         )}
-        <div className="spacer" />
         {session.transcriptionStatus === "failed" && (
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn"
             onClick={retry}
             disabled={retrying}
           >
             <RefreshCw size={14} />
             {retrying ? "Retrying…" : "Retry transcription"}
-          </button>
-        )}
-        {session.transcriptionStatus === "complete" && text && (
-          <button type="button" className="btn" onClick={copy}>
-            <Copy size={14} />
-            Copy
           </button>
         )}
         {(session.syncStatus === "failed" ||

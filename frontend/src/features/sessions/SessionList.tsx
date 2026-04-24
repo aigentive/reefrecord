@@ -187,33 +187,36 @@ function SessionRow({
         <div className="session-row-preview">{session.transcriptPreview}</div>
       )}
       <div className="session-row-meta">
-        <span>{formatSeconds(session.durationSeconds)}</span>
+        <span className="session-row-quant">
+          {formatSeconds(session.durationSeconds)}
+          {typeof session.transcriptionCostUsd === "number" && (
+            <>
+              <span className="session-row-dot" aria-hidden>·</span>
+              <span
+                title={
+                  session.transcriptionTotalTokens
+                    ? `${formatTokens(session.transcriptionPromptTokens ?? 0)} in · ${formatTokens(
+                        session.transcriptionOutputTokens ?? 0
+                      )} out${
+                        session.transcriptionModel
+                          ? ` · ${session.transcriptionModel}`
+                          : ""
+                      }`
+                    : undefined
+                }
+                className="session-row-cost"
+              >
+                {formatUsd(session.transcriptionCostUsd)}
+              </span>
+            </>
+          )}
+        </span>
         <span className="session-row-tag" data-state={transStatus}>
           {labelTrans(transStatus, transcriptBusy)}
         </span>
         <span className="session-row-tag" data-state={syncStatus}>
           {labelSync(syncStatus, syncing)}
         </span>
-        {typeof session.transcriptionCostUsd === "number" && (
-          <span
-            className="session-row-cost"
-            title={
-              session.transcriptionTotalTokens
-                ? `${formatTokens(
-                    session.transcriptionPromptTokens ?? 0
-                  )} in · ${formatTokens(
-                    session.transcriptionOutputTokens ?? 0
-                  )} out${
-                    session.transcriptionModel
-                      ? ` · ${session.transcriptionModel}`
-                      : ""
-                  }`
-                : undefined
-            }
-          >
-            {formatUsd(session.transcriptionCostUsd)}
-          </span>
-        )}
         <div className="spacer" />
         <button
           type="button"

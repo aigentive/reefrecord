@@ -237,13 +237,6 @@ export function App() {
                 <h3 style={{ margin: 0, fontSize: 14 }}>
                   Transcript — {selectedSession.id}
                 </h3>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setSelectedSessionId(null)}
-                >
-                  Close
-                </button>
               </div>
               <TranscriptDrawer
                 session={selectedSession}

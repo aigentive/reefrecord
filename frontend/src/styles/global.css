@@ -179,15 +179,21 @@ a:hover {
   background: var(--teal-50);
 }
 
+/* Icon buttons are ghost by default — no border, no shadow — so they don't
+   visually compete with inline status chips in tight rows. */
 .btn-icon {
   width: 32px;
   height: 32px;
   padding: 0;
   justify-content: center;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
   color: var(--teal-700);
 }
 
 .btn-icon:hover:not(:disabled) {
+  background: var(--teal-50);
   color: var(--teal-800);
 }
 
@@ -660,19 +666,31 @@ textarea.input {
   color: var(--muted);
 }
 
-.session-row-cost {
+.session-row-quant {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 500;
-  color: var(--accent-dark);
+  color: var(--ink-200);
   font-variant-numeric: tabular-nums;
+}
+
+.session-row-dot {
+  color: var(--fg3, #6B6862);
+  opacity: 0.6;
+}
+
+.session-row-cost {
+  color: var(--teal-700);
+  font-weight: 500;
   cursor: help;
 }
 
 .session-row .btn-icon {
-  width: 24px;
-  height: 24px;
-  padding: 3px;
+  width: 26px;
+  height: 26px;
+  padding: 2px;
 }
 
 .session-row .btn-icon:focus-visible {
