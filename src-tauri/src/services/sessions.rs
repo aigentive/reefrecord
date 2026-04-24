@@ -41,6 +41,16 @@ pub struct SessionSummary {
     pub transcription_status: TranscriptionStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcription_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_prompt_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_output_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_total_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_cost_usd: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_model: Option<String>,
     pub sync_status: SyncStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_error: Option<String>,

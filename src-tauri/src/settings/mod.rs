@@ -19,6 +19,8 @@ pub struct Settings {
     pub language_hint: String,
     pub include_speaker_labels: bool,
     pub include_timestamps: bool,
+    pub gemini_input_cost_per_million_usd: f64,
+    pub gemini_output_cost_per_million_usd: f64,
     pub github_sync_enabled: bool,
     pub github_repo_url: String,
     pub github_target_folder: String,
@@ -38,6 +40,10 @@ impl Default for Settings {
             language_hint: "Romanian with possible English".to_string(),
             include_speaker_labels: true,
             include_timestamps: true,
+            // Defaults match Gemini 3 Flash Preview audio-input + text-output
+            // public pricing. Override in Settings if you switch models.
+            gemini_input_cost_per_million_usd: 1.00,
+            gemini_output_cost_per_million_usd: 3.00,
             github_sync_enabled: false,
             github_repo_url: String::new(),
             github_target_folder: "sessions".to_string(),
@@ -59,6 +65,8 @@ pub struct SettingsInput {
     pub language_hint: Option<String>,
     pub include_speaker_labels: Option<bool>,
     pub include_timestamps: Option<bool>,
+    pub gemini_input_cost_per_million_usd: Option<f64>,
+    pub gemini_output_cost_per_million_usd: Option<f64>,
     pub github_sync_enabled: Option<bool>,
     pub github_repo_url: Option<String>,
     pub github_target_folder: Option<String>,
@@ -137,6 +145,12 @@ impl SettingsStore {
         }
         if let Some(v) = input.include_timestamps {
             current.include_timestamps = v;
+        }
+        if let Some(v) = input.gemini_input_cost_per_million_usd {
+            current.gemini_input_cost_per_million_usd = v.max(0.0);
+        }
+        if let Some(v) = input.gemini_output_cost_per_million_usd {
+            current.gemini_output_cost_per_million_usd = v.max(0.0);
         }
         if let Some(v) = input.github_sync_enabled {
             current.github_sync_enabled = v;

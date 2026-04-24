@@ -44,6 +44,35 @@ struct GenerateContentResponse {
     candidates: Option<Vec<Candidate>>,
     #[allow(dead_code)]
     prompt_feedback: Option<Value>,
+    #[serde(rename = "usageMetadata")]
+    usage_metadata: Option<UsageMetadata>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize)]
+struct UsageMetadata {
+    #[serde(rename = "promptTokenCount", default)]
+    prompt_token_count: u64,
+    #[serde(rename = "candidatesTokenCount", default)]
+    candidates_token_count: u64,
+    #[serde(rename = "totalTokenCount", default)]
+    total_token_count: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct GeminiUsage {
+    pub prompt_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
+impl GeminiUsage {
+    pub fn add(self, other: GeminiUsage) -> Self {
+        Self {
+            prompt_tokens: self.prompt_tokens + other.prompt_tokens,
+            output_tokens: self.output_tokens + other.output_tokens,
+            total_tokens: self.total_tokens + other.total_tokens,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -213,7 +242,7 @@ impl GeminiClient {
         model: &str,
         prompt: &str,
         audio_part: AudioPart,
-    ) -> AppResult<String> {
+    ) -> AppResult<(String, GeminiUsage)> {
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
             model
@@ -278,6 +307,15 @@ impl GeminiClient {
                         truncate(&body_text, 200)
                     ))
                 })?;
+            let usage = parsed
+                .usage_metadata
+                .clone()
+                .map(|u| GeminiUsage {
+                    prompt_tokens: u.prompt_token_count,
+                    output_tokens: u.candidates_token_count,
+                    total_tokens: u.total_token_count,
+                })
+                .unwrap_or_default();
             let text = parsed
                 .candidates
                 .and_then(|mut c| c.drain(..).next())
@@ -286,7 +324,7 @@ impl GeminiClient {
                 .and_then(|mut p| p.drain(..).next())
                 .and_then(|p| p.text);
             match text {
-                Some(t) if !t.trim().is_empty() => return Ok(t),
+                Some(t) if !t.trim().is_empty() => return Ok((t, usage)),
                 _ => return Err(AppError::Gemini("empty transcript returned".into())),
             }
         }

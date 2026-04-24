@@ -141,6 +141,26 @@ function SessionRow({
         <span className="session-row-tag" data-state={syncStatus}>
           {labelSync(syncStatus, syncing)}
         </span>
+        {typeof session.transcriptionCostUsd === "number" && (
+          <span
+            className="session-row-cost"
+            title={
+              session.transcriptionTotalTokens
+                ? `${formatTokens(
+                    session.transcriptionPromptTokens ?? 0
+                  )} in · ${formatTokens(
+                    session.transcriptionOutputTokens ?? 0
+                  )} out${
+                    session.transcriptionModel
+                      ? ` · ${session.transcriptionModel}`
+                      : ""
+                  }`
+                : undefined
+            }
+          >
+            {formatUsd(session.transcriptionCostUsd)}
+          </span>
+        )}
         <div className="spacer" />
         <button
           type="button"
@@ -210,6 +230,18 @@ function formatSeconds(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+function formatUsd(n: number): string {
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  if (n < 1) return `$${n.toFixed(3)}`;
+  return `$${n.toFixed(2)}`;
+}
+
+function formatTokens(n: number): string {
+  if (n < 1000) return `${n} tok`;
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k tok`;
+  return `${(n / 1_000_000).toFixed(2)}M tok`;
 }
 
 function labelTrans(

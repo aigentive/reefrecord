@@ -173,6 +173,59 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
             <div className="field-hint" style={{ marginLeft: 44, marginTop: -6 }}>
               Turn off for a clean flowing transcript.
             </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 10,
+                marginTop: 4,
+              }}
+            >
+              <div className="field">
+                <label className="field-label" htmlFor="s-in-cost">
+                  Input $/1M tokens
+                </label>
+                <input
+                  id="s-in-cost"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={draft.geminiInputCostPerMillionUsd}
+                  onChange={(e) =>
+                    set(
+                      "geminiInputCostPerMillionUsd",
+                      Number(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor="s-out-cost">
+                  Output $/1M tokens
+                </label>
+                <input
+                  id="s-out-cost"
+                  className="input"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={draft.geminiOutputCostPerMillionUsd}
+                  onChange={(e) =>
+                    set(
+                      "geminiOutputCostPerMillionUsd",
+                      Number(e.target.value) || 0
+                    )
+                  }
+                />
+              </div>
+            </div>
+            <div className="field-hint">
+              Used to compute per-session cost from usageMetadata. Defaults
+              match Gemini 3 Flash Preview audio-in / text-out. Update if you
+              change models.
+            </div>
           </section>
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>

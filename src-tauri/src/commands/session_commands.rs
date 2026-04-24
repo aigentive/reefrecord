@@ -64,6 +64,11 @@ pub async fn transcribe_session(
 
     summary.transcription_status = TranscriptionStatus::Transcribing;
     summary.transcription_error = None;
+    summary.transcription_prompt_tokens = None;
+    summary.transcription_output_tokens = None;
+    summary.transcription_total_tokens = None;
+    summary.transcription_cost_usd = None;
+    summary.transcription_model = None;
     state.sessions.upsert(summary.clone())?;
 
     let client = GeminiClient::new(key)?;
@@ -83,11 +88,21 @@ pub async fn transcribe_session(
     ));
 
     match transcribe(&client, job).await {
-        Ok(text) => {
-            std::fs::write(&transcript_path, text)?;
+        Ok(outcome) => {
+            std::fs::write(&transcript_path, &outcome.text)?;
+            let usd = (outcome.usage.prompt_tokens as f64
+                * settings.gemini_input_cost_per_million_usd
+                + outcome.usage.output_tokens as f64
+                    * settings.gemini_output_cost_per_million_usd)
+                / 1_000_000.0;
             summary.transcript_path = Some(transcript_path.to_string_lossy().to_string());
             summary.transcription_status = TranscriptionStatus::Complete;
             summary.transcription_error = None;
+            summary.transcription_prompt_tokens = Some(outcome.usage.prompt_tokens);
+            summary.transcription_output_tokens = Some(outcome.usage.output_tokens);
+            summary.transcription_total_tokens = Some(outcome.usage.total_tokens);
+            summary.transcription_cost_usd = Some(usd);
+            summary.transcription_model = Some(outcome.model_used);
             state.sessions.upsert(summary.clone())?;
             Ok(TranscriptResult {
                 session_id: summary.id,

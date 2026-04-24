@@ -35,6 +35,8 @@ export type Settings = {
   languageHint: string;
   includeSpeakerLabels: boolean;
   includeTimestamps: boolean;
+  geminiInputCostPerMillionUsd: number;
+  geminiOutputCostPerMillionUsd: number;
   githubSyncEnabled: boolean;
   githubRepoUrl: string;
   githubTargetFolder: string;
@@ -81,6 +83,11 @@ export type SessionSummary = {
   systemDeviceName: string | null;
   transcriptionStatus: TranscriptionStatus;
   transcriptionError?: string;
+  transcriptionPromptTokens?: number;
+  transcriptionOutputTokens?: number;
+  transcriptionTotalTokens?: number;
+  transcriptionCostUsd?: number;
+  transcriptionModel?: string;
   syncStatus: SyncStatus;
   syncError?: string;
 };

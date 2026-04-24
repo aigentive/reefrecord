@@ -4,9 +4,15 @@ use hound::WavReader;
 
 use crate::error::{AppError, AppResult};
 use crate::gemini::client::{
-    build_file_audio_part, build_inline_audio_part, GeminiClient,
+    build_file_audio_part, build_inline_audio_part, GeminiClient, GeminiUsage,
 };
 use crate::gemini::GEMINI_AUDIO_INLINE_LIMIT;
+
+pub struct TranscriptionOutcome {
+    pub text: String,
+    pub usage: GeminiUsage,
+    pub model_used: String,
+}
 
 pub struct TranscriptionJob {
     pub wav_path: PathBuf,
@@ -21,7 +27,7 @@ pub struct TranscriptionJob {
 pub async fn transcribe(
     client: &GeminiClient,
     job: TranscriptionJob,
-) -> AppResult<String> {
+) -> AppResult<TranscriptionOutcome> {
     let chunks = split_wav_if_needed(&job.wav_path, job.chunk_minutes)?;
     tracing::info!(
         wav = %job.wav_path.display(),
@@ -29,7 +35,9 @@ pub async fn transcribe(
         chunk_minutes = job.chunk_minutes,
         "starting transcription"
     );
-    let mut collected = Vec::<String>::new();
+    let mut collected_text = Vec::<String>::new();
+    let mut total_usage = GeminiUsage::default();
+    let mut last_model = job.primary_model.clone();
     for (idx, (chunk_path, offset_s)) in chunks.iter().enumerate() {
         tracing::info!(
             chunk = idx + 1,
@@ -43,7 +51,7 @@ pub async fn transcribe(
             job.include_speaker_labels,
             job.include_timestamps,
         );
-        let text = transcribe_chunk(
+        let (text, usage, model_used) = transcribe_chunk(
             client,
             chunk_path,
             &prompt,
@@ -51,17 +59,23 @@ pub async fn transcribe(
             &job.fallback_model,
         )
         .await?;
-        collected.push(text);
+        collected_text.push(text);
+        total_usage = total_usage.add(usage);
+        last_model = model_used;
         // Clean up chunk file if split.
         if chunk_path != &job.wav_path {
             let _ = std::fs::remove_file(chunk_path);
         }
     }
 
-    if collected.is_empty() {
+    if collected_text.is_empty() {
         return Err(AppError::Gemini("no transcript produced".into()));
     }
-    Ok(collected.join("\n\n"))
+    Ok(TranscriptionOutcome {
+        text: collected_text.join("\n\n"),
+        usage: total_usage,
+        model_used: last_model,
+    })
 }
 
 async fn transcribe_chunk(
@@ -70,7 +84,7 @@ async fn transcribe_chunk(
     prompt: &str,
     primary: &str,
     fallback: &str,
-) -> AppResult<String> {
+) -> AppResult<(String, GeminiUsage, String)> {
     let file_size = std::fs::metadata(chunk_path)?.len();
     let audio_part = if file_size > GEMINI_AUDIO_INLINE_LIMIT {
         let uri = client.upload_audio_file(chunk_path).await?;
@@ -83,10 +97,13 @@ async fn transcribe_chunk(
         .generate_transcript(primary, prompt, audio_part.clone())
         .await
     {
-        Ok(t) => Ok(t),
+        Ok((text, usage)) => Ok((text, usage, primary.to_string())),
         Err(e) => {
             tracing::warn!("primary model {primary} failed: {e}. Trying fallback {fallback}.");
-            client.generate_transcript(fallback, prompt, audio_part).await
+            let (text, usage) = client
+                .generate_transcript(fallback, prompt, audio_part)
+                .await?;
+            Ok((text, usage, fallback.to_string()))
         }
     }
 }

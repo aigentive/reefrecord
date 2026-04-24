@@ -13,6 +13,18 @@ type Props = {
   onSessionUpdated: (s: SessionSummary) => void;
 };
 
+function formatUsd(n: number): string {
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  if (n < 1) return `$${n.toFixed(3)}`;
+  return `$${n.toFixed(2)}`;
+}
+
+function formatTokens(n: number): string {
+  if (n < 1000) return `${n} tok`;
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k tok`;
+  return `${(n / 1_000_000).toFixed(2)}M tok`;
+}
+
 export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
   const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -152,6 +164,26 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
           </button>
         )}
       </div>
+
+      {session.transcriptionStatus === "complete" &&
+        typeof session.transcriptionCostUsd === "number" && (
+          <div
+            className="field-hint"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {formatUsd(session.transcriptionCostUsd)}
+            {session.transcriptionTotalTokens
+              ? ` · ${formatTokens(session.transcriptionPromptTokens ?? 0)} in · ${formatTokens(
+                  session.transcriptionOutputTokens ?? 0
+                )} out · ${formatTokens(session.transcriptionTotalTokens)} total`
+              : ""}
+            {session.transcriptionModel ? ` · ${session.transcriptionModel}` : ""}
+          </div>
+        )}
 
       {session.transcriptionStatus === "failed" && session.transcriptionError && (
         <div className="field-error">{session.transcriptionError}</div>

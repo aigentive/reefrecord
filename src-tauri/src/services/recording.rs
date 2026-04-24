@@ -150,6 +150,11 @@ impl RecordingService {
             system_device_name: system_name,
             transcription_status: TranscriptionStatus::Pending,
             transcription_error: None,
+            transcription_prompt_tokens: None,
+            transcription_output_tokens: None,
+            transcription_total_tokens: None,
+            transcription_cost_usd: None,
+            transcription_model: None,
             sync_status,
             sync_error: None,
         };
