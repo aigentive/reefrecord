@@ -93,11 +93,13 @@ impl GeminiClient {
 
     /// Quick validation: list models and look for the configured model.
     pub async fn validate(&self, model: &str) -> AppResult<String> {
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key={}",
-            urlencoding(&self.api_key)
-        );
-        let resp = self.http.get(url).send().await?;
+        let url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200";
+        let resp = self
+            .http
+            .get(url)
+            .header("x-goog-api-key", &self.api_key)
+            .send()
+            .await?;
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
         if !status.is_success() {
@@ -132,13 +134,11 @@ impl GeminiClient {
             .unwrap_or("audio.wav")
             .to_string();
 
-        let start_url = format!(
-            "https://generativelanguage.googleapis.com/upload/v1beta/files?key={}",
-            urlencoding(&self.api_key)
-        );
+        let start_url = "https://generativelanguage.googleapis.com/upload/v1beta/files";
         let start_resp = self
             .http
-            .post(&start_url)
+            .post(start_url)
+            .header("x-goog-api-key", &self.api_key)
             .header("X-Goog-Upload-Protocol", "resumable")
             .header("X-Goog-Upload-Command", "start")
             .header("X-Goog-Upload-Header-Content-Length", file_size.to_string())
@@ -186,11 +186,15 @@ impl GeminiClient {
 
         for _ in 0..60 {
             let check_url = format!(
-                "https://generativelanguage.googleapis.com/v1beta/{}?key={}",
-                file_name,
-                urlencoding(&self.api_key)
+                "https://generativelanguage.googleapis.com/v1beta/{}",
+                file_name
             );
-            let resp = self.http.get(&check_url).send().await?;
+            let resp = self
+                .http
+                .get(&check_url)
+                .header("x-goog-api-key", &self.api_key)
+                .send()
+                .await?;
             let status: FileStatusResponse = resp.json().await.unwrap_or(FileStatusResponse {
                 state: None,
                 uri: None,
@@ -211,14 +215,12 @@ impl GeminiClient {
         audio_part: AudioPart,
     ) -> AppResult<String> {
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            model,
-            urlencoding(&self.api_key)
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            model
         );
-        let parts = vec![
-            json!({ "text": prompt }),
-            serde_json::to_value(&audio_part).unwrap(),
-        ];
+        let audio_value = serde_json::to_value(&audio_part)
+            .map_err(|e| AppError::Gemini(format!("serialize audio part: {e}")))?;
+        let parts = vec![json!({ "text": prompt }), audio_value];
         let payload = json!({
             "contents": [{ "parts": parts }],
             "generationConfig": { "temperature": 0.1 }
@@ -227,7 +229,13 @@ impl GeminiClient {
         let mut attempts: u32 = 0;
         loop {
             attempts += 1;
-            let resp = self.http.post(&url).json(&payload).send().await;
+            let resp = self
+                .http
+                .post(&url)
+                .header("x-goog-api-key", &self.api_key)
+                .json(&payload)
+                .send()
+                .await;
             let (status, body_text) = match resp {
                 Ok(r) => (r.status(), r.text().await.unwrap_or_default()),
                 Err(e) => {
@@ -303,18 +311,6 @@ pub fn build_file_audio_part(file_uri: String) -> AudioPart {
             file_uri,
         },
     }
-}
-
-fn urlencoding(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
-            out.push(b as char);
-        } else {
-            out.push_str(&format!("%{:02X}", b));
-        }
-    }
-    out
 }
 
 fn truncate(s: &str, n: usize) -> String {

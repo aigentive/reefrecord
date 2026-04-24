@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use chrono::Utc;
+use chrono::{Local, Utc};
 use serde::Deserialize;
 
 use crate::audio::capture::{start_capture, InputCapture};
@@ -58,9 +58,11 @@ impl RecordingService {
             std::fs::create_dir_all(&sessions_dir)?;
         }
         let started_at_utc = Utc::now();
+        // Session id uses local wall-clock time to match user expectation and
+        // the python reference's filename format.
         let session_id = format!(
             "session_{}",
-            started_at_utc.format("%Y%m%d_%H%M%S")
+            Local::now().format("%Y%m%d_%H%M%S")
         );
 
         let mic = start_capture(input.mic_device_selector.clone(), false, "mic")

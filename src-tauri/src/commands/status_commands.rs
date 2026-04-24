@@ -95,7 +95,17 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
     } else {
         match devices::find_blackhole_device(&devices) {
             Some(d) => ProviderStatusDto::ready(d.name.clone()),
-            None => ProviderStatusDto::warning("BlackHole not detected — recording will be mic-only."),
+            None => {
+                if devices::blackhole_driver_installed() {
+                    ProviderStatusDto::warning(
+                        "BlackHole driver is installed but CoreAudio has not loaded it yet — reboot macOS.",
+                    )
+                } else {
+                    ProviderStatusDto::warning(
+                        "BlackHole not detected — recording will be mic-only.",
+                    )
+                }
+            }
         }
     };
 

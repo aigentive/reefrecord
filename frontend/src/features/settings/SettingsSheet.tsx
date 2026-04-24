@@ -43,7 +43,15 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !dirty) onClose();
+        if (e.target !== e.currentTarget) return;
+        if (!dirty) {
+          onClose();
+          return;
+        }
+        const confirmed = window.confirm(
+          "Discard unsaved changes?"
+        );
+        if (confirmed) onClose();
       }}
     >
       <div className="sheet">

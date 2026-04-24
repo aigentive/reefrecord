@@ -62,6 +62,10 @@ export function GeminiKeyForm({ status, onChanged }: Props) {
   }
 
   async function doDelete() {
+    const ok = window.confirm(
+      "Remove the saved Gemini API key from the keychain? You can paste it again later."
+    );
+    if (!ok) return;
     setMsg(null);
     try {
       await deleteGeminiKey();

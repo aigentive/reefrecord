@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Settings as SettingsIcon } from "lucide-react";
 import { SetupRail } from "./features/setup/SetupRail";
 import { InlineSetup } from "./features/setup/InlineSetup";
@@ -11,6 +11,7 @@ import {
   getAppStatus,
   getSettings,
   listSessions,
+  selectSessionsFolder,
 } from "./api/bridge";
 
 export type SetupPanelKey =
@@ -66,8 +67,26 @@ export function App() {
   }, [refreshStatus, refreshSettings, refreshSessions]);
 
   // Progressive setup: if required items are missing, auto-open the first one.
+  // Folder is also auto-picked natively on first run when missing — matches
+  // the spec's "open native folder picker" behavior.
+  const folderAutoPickedRef = useRef(false);
   useEffect(() => {
     if (!status) return;
+    if (
+      !folderAutoPickedRef.current &&
+      status.folder.state === "missing"
+    ) {
+      folderAutoPickedRef.current = true;
+      selectSessionsFolder()
+        .then(async () => {
+          await refreshStatus();
+          await refreshSettings();
+        })
+        .catch(() => {
+          setOpenPanel("folder");
+        });
+      return;
+    }
     if (openPanel !== null) return;
     if (status.gemini.state !== "ready") {
       setOpenPanel("gemini");
@@ -77,10 +96,10 @@ export function App() {
       setOpenPanel("folder");
       return;
     }
-    if (status.mic.state === "denied") {
+    if (status.mic.state === "denied" || status.mic.state === "missing") {
       setOpenPanel("mic");
     }
-  }, [status, openPanel]);
+  }, [status, openPanel, refreshStatus, refreshSettings]);
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) ?? null,

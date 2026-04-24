@@ -5,6 +5,27 @@ use crate::error::{AppError, AppResult};
 
 pub const BLACKHOLE_FRAGMENTS: &[&str] = &["blackhole", "black hole"];
 
+#[cfg(target_os = "macos")]
+const HAL_PLUGIN_DIR: &str = "/Library/Audio/Plug-Ins/HAL";
+#[cfg(target_os = "macos")]
+const BLACKHOLE_DRIVER_BUNDLES: &[&str] =
+    &["BlackHole2ch.driver", "BlackHole16ch.driver", "BlackHole64ch.driver"];
+
+/// Returns true if a BlackHole `.driver` bundle is installed on disk even when
+/// CoreAudio hasn't loaded it yet. Matches the hint shown by `recorder.py`:
+/// "BlackHole is installed on disk, but CoreAudio has not loaded it yet — reboot".
+#[cfg(target_os = "macos")]
+pub fn blackhole_driver_installed() -> bool {
+    BLACKHOLE_DRIVER_BUNDLES
+        .iter()
+        .any(|bundle| std::path::Path::new(HAL_PLUGIN_DIR).join(bundle).exists())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn blackhole_driver_installed() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioDevice {

@@ -171,9 +171,10 @@ fn run_git_capture(cwd: &PathBuf, args: &[&str], allow_long: bool) -> AppResult<
     cmd.args(args);
     cmd.env("GIT_TERMINAL_PROMPT", "0");
     cmd.env("GIT_CLONE_PROTECTION_ACTIVE", "false");
+    let redacted_args = redact_url(&args.join(" "));
     let output = cmd
         .output()
-        .map_err(|e| AppError::Git(format!("git {:?}: {e}", args)))?;
+        .map_err(|e| AppError::Git(format!("git {}: {e}", redacted_args)))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -215,8 +216,14 @@ fn ensure_commit_identity(cwd: &PathBuf) -> AppResult<()> {
         .current_dir(cwd)
         .args(["config", "user.email"])
         .output();
-    let name_ok = matches!(&name, Ok(o) if o.status.success() && !o.stdout.is_empty());
-    let email_ok = matches!(&email, Ok(o) if o.status.success() && !o.stdout.is_empty());
+    let name_ok = matches!(
+        &name,
+        Ok(o) if o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty()
+    );
+    let email_ok = matches!(
+        &email,
+        Ok(o) if o.status.success() && !String::from_utf8_lossy(&o.stdout).trim().is_empty()
+    );
     if !name_ok {
         run_git(cwd, &["config", "user.name", "Reef Recorder"], false)?;
     }
@@ -226,31 +233,52 @@ fn ensure_commit_identity(cwd: &PathBuf) -> AppResult<()> {
     Ok(())
 }
 
+/// Redact userinfo segments (user:password@) from any URLs found in a string.
+/// Handles text where URLs are embedded in messages or argument lists.
 fn redact_url(text: &str) -> String {
-    // Remove credentials from URLs of form https://user:token@host/...
-    let re = regex_like_strip_credentials(text);
-    re
-}
-
-fn regex_like_strip_credentials(text: &str) -> String {
-    // Hand-rolled since we don't pull `regex` for a single pattern.
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(idx) = rest.find("://") {
         out.push_str(&rest[..idx + 3]);
         let after = &rest[idx + 3..];
-        if let Some(at_rel) = after.find('@') {
-            // ensure no whitespace before '@' (i.e. same token)
-            let up_to_at = &after[..at_rel];
-            let next_slash = up_to_at.find('/').unwrap_or(up_to_at.len());
-            if next_slash > at_rel {
-                out.push_str("***@");
-                rest = &after[at_rel + 1..];
-                continue;
-            }
+        // Find the end of the authority segment: first '/', '?', '#', whitespace, quote, or EOS.
+        let authority_end = after
+            .find(|c: char| matches!(c, '/' | '?' | '#' | ' ' | '"' | '\'' | '\t' | '\n' | '\r'))
+            .unwrap_or(after.len());
+        let authority = &after[..authority_end];
+        if let Some(at_pos) = authority.find('@') {
+            out.push_str("***@");
+            out.push_str(&authority[at_pos + 1..]);
+        } else {
+            out.push_str(authority);
         }
-        rest = after;
+        rest = &after[authority_end..];
     }
     out.push_str(rest);
     out
+}
+
+#[cfg(test)]
+mod redact_tests {
+    use super::redact_url;
+
+    #[test]
+    fn strips_userinfo_from_https() {
+        let red = redact_url("clone https://user:token@github.com/org/repo.git failed");
+        assert_eq!(red, "clone https://***@github.com/org/repo.git failed");
+    }
+
+    #[test]
+    fn leaves_unauthenticated_urls_alone() {
+        let red = redact_url("clone https://github.com/org/repo.git");
+        assert_eq!(red, "clone https://github.com/org/repo.git");
+    }
+
+    #[test]
+    fn handles_multiple_urls() {
+        let red = redact_url(
+            "before https://u:p@host.com/x and after git@github.com:org/repo.git",
+        );
+        assert!(red.contains("***@host.com/x"));
+    }
 }

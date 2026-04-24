@@ -32,13 +32,15 @@ pub fn write_wav_mono_i16(path: &Path, samples: &[i16]) -> AppResult<()> {
 }
 
 /// Mix two mono int16 buffers sample-by-sample with int clamping.
-/// Shorter buffer is padded with silence.
+/// Matches the Python reference (`recorder.py::mix_audio`) which truncates to
+/// the shorter buffer — this keeps the two streams aligned and drops the tail
+/// of whichever side captured more samples.
 pub fn mix_mono_i16(a: &[i16], b: &[i16]) -> Vec<i16> {
-    let len = a.len().max(b.len());
+    let len = a.len().min(b.len());
     let mut out = Vec::with_capacity(len);
     for i in 0..len {
-        let av = *a.get(i).unwrap_or(&0) as i32;
-        let bv = *b.get(i).unwrap_or(&0) as i32;
+        let av = a[i] as i32;
+        let bv = b[i] as i32;
         out.push((av + bv).clamp(i16::MIN as i32, i16::MAX as i32) as i16);
     }
     out
