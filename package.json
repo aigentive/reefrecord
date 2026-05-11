@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "cd frontend && npm run dev",
     "frontend:install": "cd frontend && npm install",
-    "tauri:dev": "cd frontend && npx tauri dev",
-    "tauri:build": "cd frontend && npx tauri build",
+    "tauri:dev": "./frontend/node_modules/.bin/tauri dev",
+    "tauri:build": "./frontend/node_modules/.bin/tauri build",
     "typecheck": "cd frontend && npm run typecheck",
     "test:e2e": "cd frontend && npm run test:e2e",
     "test:gemini": "cd src-tauri && cargo test gemini::transcription::tests::real_gemini_transcribes_silent_wav_with_existing_key -- --ignored --exact"
