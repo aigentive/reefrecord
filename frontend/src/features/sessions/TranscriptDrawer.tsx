@@ -179,8 +179,10 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
               ? ` · ${formatTokens(session.transcriptionPromptTokens ?? 0)} in · ${formatTokens(
                   session.transcriptionOutputTokens ?? 0
                 )} out · ${formatTokens(session.transcriptionTotalTokens)} total`
+              : session.transcriptionUsage
+              ? ` · ${formatUsage(session)}`
               : ""}
-            {session.transcriptionModel ? ` · ${session.transcriptionModel}` : ""}
+            {providerModel(session) ? ` · ${providerModel(session)}` : ""}
           </div>
         )}
 
@@ -205,4 +207,42 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
       )}
     </>
   );
+}
+
+function providerModel(session: SessionSummary): string {
+  const provider = session.transcriptionProvider
+    ? providerName(session.transcriptionProvider)
+    : "";
+  const model = session.transcriptionModel ?? "";
+  return [provider, model].filter(Boolean).join(" · ");
+}
+
+function providerName(provider: NonNullable<SessionSummary["transcriptionProvider"]>): string {
+  switch (provider) {
+    case "gemini":
+      return "Gemini";
+    case "openai":
+      return "OpenAI";
+    case "deepgram":
+      return "Deepgram";
+  }
+}
+
+function formatUsage(session: SessionSummary): string {
+  const usage = session.transcriptionUsage;
+  if (!usage) return "";
+  switch (usage.kind) {
+    case "tokens":
+      return `${formatTokens(usage.promptTokens)} in · ${formatTokens(
+        usage.outputTokens
+      )} out · ${formatTokens(usage.totalTokens)} total`;
+    case "duration":
+      return `${Math.round(usage.seconds)} sec`;
+    case "deepgram":
+      return typeof usage.durationSeconds === "number"
+        ? `${Math.round(usage.durationSeconds)} sec`
+        : "Deepgram";
+    case "unknown":
+      return "";
+  }
 }

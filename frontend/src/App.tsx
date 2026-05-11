@@ -18,7 +18,7 @@ import {
 } from "./api/bridge";
 
 export type SetupPanelKey =
-  | "gemini"
+  | "parser"
   | "folder"
   | "mic"
   | "systemAudio"
@@ -91,8 +91,11 @@ export function App() {
       return;
     }
     if (openPanel !== null) return;
-    if (status.gemini.state !== "ready") {
-      setOpenPanel("gemini");
+    if (
+      status.transcription.state !== "ready" &&
+      status.transcription.state !== "warning"
+    ) {
+      setOpenPanel("parser");
       return;
     }
     if (status.folder.state !== "ready") {

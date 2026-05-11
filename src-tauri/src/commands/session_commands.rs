@@ -2,12 +2,12 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::gemini::client::GeminiClient;
-use crate::gemini::transcription::{transcribe, TranscriptionJob};
 use crate::git_sync::{self, GitSyncStatus, SyncOutcome};
 use crate::services::recording::RecordingInput;
 use crate::services::secrets;
 use crate::services::sessions::{SessionSummary, SyncStatus, TranscriptionStatus};
+use crate::transcription;
+use crate::transcription::types::{TranscriptionProvider, TranscriptionUsage};
 use crate::AppState;
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,10 +45,12 @@ pub async fn stop_recording(
 pub async fn transcribe_session(
     state: State<'_, AppState>,
     session_id: String,
+    provider: Option<TranscriptionProvider>,
 ) -> AppResult<SessionSummary> {
-    let key = secrets::read_gemini_key()?
-        .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?;
     let settings = state.settings.get();
+    let provider = provider.unwrap_or(settings.transcription_provider);
+    let key = secrets::read_transcription_key(provider)?
+        .ok_or_else(|| AppError::Invalid(format!("No {} API key saved.", provider.label())))?;
     let mut summary = state
         .sessions
         .get(&session_id)
@@ -70,39 +72,32 @@ pub async fn transcribe_session(
     summary.transcription_total_tokens = None;
     summary.transcription_cost_usd = None;
     summary.transcription_model = None;
+    summary.transcription_provider = Some(provider);
+    summary.transcription_usage = None;
     state.sessions.upsert(summary.clone())?;
 
-    let client = GeminiClient::new(key)?;
-    let job = TranscriptionJob {
-        wav_path: wav_path.clone(),
-        primary_model: settings.gemini_model.clone(),
-        fallback_model: settings.gemini_fallback_model.clone(),
-        chunk_minutes: settings.chunk_minutes,
-        language_hint: settings.language_hint.clone(),
-        include_speaker_labels: settings.include_speaker_labels,
-        include_timestamps: settings.include_timestamps,
-    };
     let transcript_path = wav_path.with_file_name(format!(
-        "{}_gemini.txt",
-        wav_path.file_stem().and_then(|s| s.to_str()).unwrap_or(&summary.id)
+        "{}_{}.txt",
+        wav_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&summary.id),
+        provider
     ));
 
-    match transcribe(&client, job).await {
+    match transcription::transcribe(provider, key, &settings, wav_path.clone()).await {
         Ok(outcome) => {
+            remove_replaced_transcript(&summary, &transcript_path);
             std::fs::write(&transcript_path, &outcome.text)?;
-            let usd = (outcome.usage.prompt_tokens as f64
-                * settings.gemini_input_cost_per_million_usd
-                + outcome.usage.output_tokens as f64
-                    * settings.gemini_output_cost_per_million_usd)
-                / 1_000_000.0;
+            let usd = transcription::estimate_cost(&settings, &outcome);
             summary.transcript_path = Some(transcript_path.to_string_lossy().to_string());
             summary.transcription_status = TranscriptionStatus::Complete;
             summary.transcription_error = None;
-            summary.transcription_prompt_tokens = Some(outcome.usage.prompt_tokens);
-            summary.transcription_output_tokens = Some(outcome.usage.output_tokens);
-            summary.transcription_total_tokens = Some(outcome.usage.total_tokens);
+            set_legacy_usage_fields(&mut summary, &outcome.usage);
             summary.transcription_cost_usd = Some(usd);
             summary.transcription_model = Some(outcome.model_used);
+            summary.transcription_provider = Some(outcome.provider);
+            summary.transcription_usage = Some(outcome.usage);
             state.sessions.upsert(summary.clone())?;
             Ok(summary)
         }
@@ -112,6 +107,43 @@ pub async fn transcribe_session(
             state.sessions.upsert(summary.clone())?;
             Err(e)
         }
+    }
+}
+
+fn set_legacy_usage_fields(summary: &mut SessionSummary, usage: &TranscriptionUsage) {
+    match usage {
+        TranscriptionUsage::Tokens {
+            prompt_tokens,
+            output_tokens,
+            total_tokens,
+            ..
+        } => {
+            summary.transcription_prompt_tokens = Some(*prompt_tokens);
+            summary.transcription_output_tokens = Some(*output_tokens);
+            summary.transcription_total_tokens = Some(*total_tokens);
+        }
+        _ => {
+            summary.transcription_prompt_tokens = None;
+            summary.transcription_output_tokens = None;
+            summary.transcription_total_tokens = None;
+        }
+    }
+}
+
+fn remove_replaced_transcript(summary: &SessionSummary, next_path: &std::path::Path) {
+    let Some(existing) = summary.transcript_path.as_deref() else {
+        return;
+    };
+    let existing_path = std::path::Path::new(existing);
+    if existing_path == next_path || !existing_path.exists() {
+        return;
+    }
+    let Some(name) = existing_path.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    let same_parent = existing_path.parent() == next_path.parent();
+    if same_parent && name.starts_with(&summary.id) && name.ends_with(".txt") {
+        let _ = std::fs::remove_file(existing_path);
     }
 }
 
@@ -137,10 +169,7 @@ pub async fn read_transcript(
 }
 
 #[tauri::command]
-pub async fn sync_session(
-    state: State<'_, AppState>,
-    session_id: String,
-) -> AppResult<SyncResult> {
+pub async fn sync_session(state: State<'_, AppState>, session_id: String) -> AppResult<SyncResult> {
     let settings = state.settings.get();
     let mut summary = state
         .sessions

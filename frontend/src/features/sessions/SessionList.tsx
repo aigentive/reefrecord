@@ -189,20 +189,24 @@ function SessionRow({
       <div className="session-row-meta">
         <span className="session-row-quant">
           {formatSeconds(session.durationSeconds)}
+          {providerModel(session) && (
+            <>
+              <span className="session-row-dot" aria-hidden>·</span>
+              <span>{providerModel(session)}</span>
+            </>
+          )}
           {typeof session.transcriptionCostUsd === "number" && (
             <>
               <span className="session-row-dot" aria-hidden>·</span>
               <span
                 title={
-                  session.transcriptionTotalTokens
+                  session.transcriptionUsage
+                    ? formatUsageTitle(session)
+                    : session.transcriptionTotalTokens
                     ? `${formatTokens(session.transcriptionPromptTokens ?? 0)} in · ${formatTokens(
                         session.transcriptionOutputTokens ?? 0
-                      )} out${
-                        session.transcriptionModel
-                          ? ` · ${session.transcriptionModel}`
-                          : ""
-                      }`
-                    : undefined
+                      )} out${modelSuffix(session)}`
+                    : providerModel(session) || undefined
                 }
                 className="session-row-cost"
               >
@@ -230,7 +234,7 @@ function SessionRow({
           }
           title={
             transStatus === "complete"
-              ? "Retranscribe (re-run Gemini with current settings)"
+              ? "Retranscribe with selected parser"
               : transStatus === "failed"
               ? "Retry transcription"
               : "Transcribe"
@@ -322,6 +326,51 @@ function formatTokens(n: number): string {
   if (n < 1000) return `${n} tok`;
   if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k tok`;
   return `${(n / 1_000_000).toFixed(2)}M tok`;
+}
+
+function providerModel(session: SessionSummary): string {
+  const provider = session.transcriptionProvider
+    ? providerName(session.transcriptionProvider)
+    : "";
+  const model = session.transcriptionModel ?? "";
+  return [provider, model].filter(Boolean).join(" · ");
+}
+
+function modelSuffix(session: SessionSummary): string {
+  const text = providerModel(session);
+  return text ? ` · ${text}` : "";
+}
+
+function providerName(provider: NonNullable<SessionSummary["transcriptionProvider"]>): string {
+  switch (provider) {
+    case "gemini":
+      return "Gemini";
+    case "openai":
+      return "OpenAI";
+    case "deepgram":
+      return "Deepgram";
+  }
+}
+
+function formatUsageTitle(session: SessionSummary): string | undefined {
+  const usage = session.transcriptionUsage;
+  if (!usage) return providerModel(session) || undefined;
+  switch (usage.kind) {
+    case "tokens":
+      return `${formatTokens(usage.promptTokens)} in · ${formatTokens(
+        usage.outputTokens
+      )} out · ${formatTokens(usage.totalTokens)} total${modelSuffix(session)}`;
+    case "duration":
+      return `${formatSeconds(Math.round(usage.seconds))}${modelSuffix(session)}`;
+    case "deepgram":
+      return `${
+        typeof usage.durationSeconds === "number"
+          ? formatSeconds(Math.round(usage.durationSeconds))
+          : "Deepgram"
+      }${modelSuffix(session)}`;
+    case "unknown":
+      return providerModel(session) || undefined;
+  }
 }
 
 function labelTrans(

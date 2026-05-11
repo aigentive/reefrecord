@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import type { AppStatus, Settings } from "../../api/types";
 import type { SetupPanelKey } from "../../App";
-import { GeminiKeyForm } from "./GeminiKeyForm";
+import { TranscriptionProviderPanel } from "./TranscriptionProviderPanel";
 import { FolderPicker } from "./FolderPicker";
 import { MicPanel } from "./MicPanel";
 import { SystemAudioPanel } from "./SystemAudioPanel";
@@ -16,7 +16,7 @@ type Props = {
 };
 
 const TITLES: Record<Exclude<SetupPanelKey, null>, string> = {
-  gemini: "Gemini API Key",
+  parser: "Parser",
   folder: "Sessions Folder",
   mic: "Microphone",
   systemAudio: "System Audio",
@@ -44,8 +44,12 @@ export function InlineSetup({
         </button>
       </div>
 
-      {panel === "gemini" && (
-        <GeminiKeyForm status={status} onChanged={onChanged} />
+      {panel === "parser" && (
+        <TranscriptionProviderPanel
+          status={status}
+          settings={settings}
+          onChanged={onChanged}
+        />
       )}
       {panel === "folder" && (
         <FolderPicker settings={settings} onChanged={onChanged} />

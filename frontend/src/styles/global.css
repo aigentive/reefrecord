@@ -333,6 +333,34 @@ textarea.input {
   outline-offset: -2px;
 }
 
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--paper-100);
+  align-self: flex-start;
+}
+
+.segmented .btn {
+  min-height: 30px;
+}
+
+.segmented .btn[data-selected="true"] {
+  background: var(--paper-0);
+  border-color: var(--teal-500);
+  color: var(--text);
+}
+
+.cost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
 /* Status dot */
 .dot {
   width: 8px;

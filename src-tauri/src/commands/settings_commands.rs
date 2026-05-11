@@ -3,11 +3,12 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::status_commands::ProviderStatusDto;
 use crate::error::{AppError, AppResult};
-use crate::gemini::client::GeminiClient;
 use crate::services::devices::{self, AudioDevice};
 use crate::services::permissions::{self, PermissionKind};
 use crate::services::secrets;
 use crate::settings::{Settings, SettingsInput};
+use crate::transcription;
+use crate::transcription::types::TranscriptionProvider;
 use crate::AppState;
 
 #[tauri::command]
@@ -24,58 +25,58 @@ pub async fn save_settings(
 }
 
 #[tauri::command]
-pub async fn save_gemini_key(
+pub async fn save_transcription_key(
     state: State<'_, AppState>,
+    provider: TranscriptionProvider,
     key: String,
 ) -> AppResult<ProviderStatusDto> {
-    secrets::save_gemini_key(&key)?;
-    // Validate after save.
+    secrets::save_transcription_key(provider, &key)?;
     let settings = state.settings.get();
-    let client = GeminiClient::new(key.trim().to_string())?;
-    let status = match client.validate(&settings.gemini_model).await {
+    let status = match transcription::validate_key(provider, key.trim(), &settings).await {
         Ok(msg) => ProviderStatusDto::ready(msg),
         Err(e) => ProviderStatusDto::warning(format!("Saved. Validation: {e}")),
     };
-    let mut cached = state.gemini_last_validation.write().await;
-    *cached = Some(status.clone());
+    let mut cached = state.transcription_last_validation.write().await;
+    cached.insert(provider, status.clone());
     Ok(status)
 }
 
 #[tauri::command]
-pub async fn has_gemini_key() -> AppResult<bool> {
-    Ok(secrets::has_gemini_key())
+pub async fn has_transcription_key(provider: TranscriptionProvider) -> AppResult<bool> {
+    Ok(secrets::has_transcription_key(provider))
 }
 
 #[tauri::command]
-pub async fn delete_gemini_key(state: State<'_, AppState>) -> AppResult<()> {
-    secrets::delete_gemini_key()?;
-    let mut cached = state.gemini_last_validation.write().await;
-    *cached = None;
+pub async fn delete_transcription_key(
+    state: State<'_, AppState>,
+    provider: TranscriptionProvider,
+) -> AppResult<()> {
+    secrets::delete_transcription_key(provider)?;
+    let mut cached = state.transcription_last_validation.write().await;
+    cached.remove(&provider);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn validate_gemini_key(
+pub async fn validate_transcription_key(
     state: State<'_, AppState>,
+    provider: TranscriptionProvider,
     key: Option<String>,
 ) -> AppResult<ProviderStatusDto> {
     let settings = state.settings.get();
     let transient = matches!(&key, Some(k) if !k.trim().is_empty());
     let effective = match key {
         Some(k) if !k.trim().is_empty() => k.trim().to_string(),
-        _ => secrets::read_gemini_key()?
-            .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?,
+        _ => secrets::read_transcription_key(provider)?
+            .ok_or_else(|| AppError::Invalid(format!("No {} API key saved.", provider.label())))?,
     };
-    let client = GeminiClient::new(effective)?;
-    let status = match client.validate(&settings.gemini_model).await {
+    let status = match transcription::validate_key(provider, &effective, &settings).await {
         Ok(msg) => ProviderStatusDto::ready(msg),
         Err(e) => ProviderStatusDto::warning(format!("Validation failed: {e}")),
     };
-    // Only cache when we validated the stored key — a transient (typed-but-
-    // unsaved) check shouldn't overwrite the status shown for the saved key.
     if !transient {
-        let mut cached = state.gemini_last_validation.write().await;
-        *cached = Some(status.clone());
+        let mut cached = state.transcription_last_validation.write().await;
+        cached.insert(provider, status.clone());
     }
     Ok(status)
 }

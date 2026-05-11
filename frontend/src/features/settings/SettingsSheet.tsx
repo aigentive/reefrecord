@@ -115,27 +115,121 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
           </section>
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>Gemini</h3>
+            <h3 style={{ margin: 0, fontSize: 14 }}>Transcription</h3>
 
-            <div className="field">
-              <label className="field-label" htmlFor="s-model">Model</label>
-              <input
-                id="s-model"
-                className="input"
-                value={draft.geminiModel}
-                onChange={(e) => set("geminiModel", e.target.value)}
-              />
+            <div className="segmented" role="group" aria-label="Active parser">
+              {(["gemini", "openai", "deepgram"] as const).map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  className="btn"
+                  data-selected={draft.transcriptionProvider === provider}
+                  onClick={() => set("transcriptionProvider", provider)}
+                >
+                  {providerLabel(provider)}
+                </button>
+              ))}
             </div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="s-fallback">Fallback model</label>
-              <input
-                id="s-fallback"
-                className="input"
-                value={draft.geminiFallbackModel}
-                onChange={(e) => set("geminiFallbackModel", e.target.value)}
-              />
-            </div>
+            {draft.transcriptionProvider === "gemini" && (
+              <>
+                <div className="field">
+                  <label className="field-label" htmlFor="s-gemini-model">
+                    Gemini model
+                  </label>
+                  <input
+                    id="s-gemini-model"
+                    className="input"
+                    value={draft.geminiModel}
+                    onChange={(e) => set("geminiModel", e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="s-gemini-fallback">
+                    Gemini fallback
+                  </label>
+                  <input
+                    id="s-gemini-fallback"
+                    className="input"
+                    value={draft.geminiFallbackModel}
+                    onChange={(e) => set("geminiFallbackModel", e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {draft.transcriptionProvider === "openai" && (
+              <>
+                <div className="field">
+                  <label className="field-label" htmlFor="s-openai-model">
+                    OpenAI model
+                  </label>
+                  <input
+                    id="s-openai-model"
+                    className="input"
+                    value={draft.openaiModel}
+                    onChange={(e) => set("openaiModel", e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="s-openai-fallback">
+                    OpenAI fallback
+                  </label>
+                  <input
+                    id="s-openai-fallback"
+                    className="input"
+                    value={draft.openaiFallbackModel}
+                    onChange={(e) => set("openaiFallbackModel", e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+              </>
+            )}
+
+            {draft.transcriptionProvider === "deepgram" && (
+              <>
+                <div className="field">
+                  <label className="field-label" htmlFor="s-deepgram-model">
+                    Deepgram model
+                  </label>
+                  <input
+                    id="s-deepgram-model"
+                    className="input"
+                    value={draft.deepgramModel}
+                    onChange={(e) => set("deepgramModel", e.target.value)}
+                  />
+                </div>
+
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.deepgramSmartFormat}
+                    onChange={(e) => set("deepgramSmartFormat", e.target.checked)}
+                  />
+                  <span>Smart format</span>
+                </label>
+
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.deepgramDiarize}
+                    onChange={(e) => set("deepgramDiarize", e.target.checked)}
+                  />
+                  <span>Diarization</span>
+                </label>
+
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.deepgramUtterances}
+                    onChange={(e) => set("deepgramUtterances", e.target.checked)}
+                  />
+                  <span>Utterances</span>
+                </label>
+              </>
+            )}
 
             <div className="field">
               <label className="field-label" htmlFor="s-chunk">Chunk minutes</label>
@@ -184,57 +278,33 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
               Turn off for a clean flowing transcript.
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 10,
-                marginTop: 4,
-              }}
-            >
-              <div className="field">
-                <label className="field-label" htmlFor="s-in-cost">
-                  Input $/1M tokens
-                </label>
-                <input
-                  id="s-in-cost"
-                  className="input"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={draft.geminiInputCostPerMillionUsd}
-                  onChange={(e) =>
-                    set(
-                      "geminiInputCostPerMillionUsd",
-                      Number(e.target.value) || 0
-                    )
-                  }
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="s-out-cost">
-                  Output $/1M tokens
-                </label>
-                <input
-                  id="s-out-cost"
-                  className="input"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={draft.geminiOutputCostPerMillionUsd}
-                  onChange={(e) =>
-                    set(
-                      "geminiOutputCostPerMillionUsd",
-                      Number(e.target.value) || 0
-                    )
-                  }
-                />
-              </div>
-            </div>
-            <div className="field-hint">
-              Used to compute per-session cost from usageMetadata. Defaults
-              match Gemini 3 Flash Preview audio-in / text-out. Update if you
-              change models.
+            <div className="cost-grid">
+              <NumberField
+                id="s-gemini-in-cost"
+                label="Gemini input $/1M"
+                value={draft.geminiInputCostPerMillionUsd}
+                onChange={(value) => set("geminiInputCostPerMillionUsd", value)}
+              />
+              <NumberField
+                id="s-gemini-out-cost"
+                label="Gemini output $/1M"
+                value={draft.geminiOutputCostPerMillionUsd}
+                onChange={(value) => set("geminiOutputCostPerMillionUsd", value)}
+              />
+              <NumberField
+                id="s-openai-minute-cost"
+                label="OpenAI $/minute"
+                value={draft.openaiCostPerMinuteUsd}
+                step="0.001"
+                onChange={(value) => set("openaiCostPerMinuteUsd", value)}
+              />
+              <NumberField
+                id="s-deepgram-hour-cost"
+                label="Deepgram $/hour"
+                value={draft.deepgramCostPerHourUsd}
+                step="0.001"
+                onChange={(value) => set("deepgramCostPerHourUsd", value)}
+              />
             </div>
           </section>
 
@@ -305,4 +375,46 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
       </div>
     </div>
   );
+}
+
+function NumberField({
+  id,
+  label,
+  value,
+  step = "0.01",
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  step?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className="input"
+        type="number"
+        step={step}
+        min={0}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+      />
+    </div>
+  );
+}
+
+function providerLabel(provider: Settings["transcriptionProvider"]): string {
+  switch (provider) {
+    case "gemini":
+      return "Gemini";
+    case "openai":
+      return "OpenAI";
+    case "deepgram":
+      return "Deepgram";
+  }
 }

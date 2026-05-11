@@ -105,6 +105,9 @@ export function RecorderPanel({
 
   const selectedMic = status?.mic.detail;
   const selectedSys = status?.systemAudio.detail;
+  const providerLabel = settings
+    ? providerName(settings.transcriptionProvider)
+    : "selected parser";
 
   return (
     <div className="recorder-panel">
@@ -135,7 +138,7 @@ export function RecorderPanel({
       </div>
 
       {phase === "transcribing" && (
-        <div className="field-hint">Transcribing with Gemini…</div>
+        <div className="field-hint">Transcribing with {providerLabel}...</div>
       )}
 
       {!status?.canRecord && status && !busy && (
@@ -147,6 +150,17 @@ export function RecorderPanel({
       {error && <div className="field-error">{error}</div>}
     </div>
   );
+}
+
+function providerName(provider: Settings["transcriptionProvider"]): string {
+  switch (provider) {
+    case "gemini":
+      return "Gemini";
+    case "openai":
+      return "OpenAI";
+    case "deepgram":
+      return "Deepgram";
+  }
 }
 
 function formatDuration(seconds: number): string {

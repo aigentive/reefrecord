@@ -10,6 +10,7 @@ import type {
   SyncResult,
   GitSyncStatus,
   ProviderStatus,
+  TranscriptionProvider,
 } from "./types";
 
 export function getAppStatus(): Promise<AppStatus> {
@@ -24,20 +25,30 @@ export function saveSettings(input: SettingsInput): Promise<Settings> {
   return invoke("save_settings", { input });
 }
 
-export function saveGeminiKey(key: string): Promise<ProviderStatus> {
-  return invoke("save_gemini_key", { key });
+export function saveTranscriptionKey(
+  provider: TranscriptionProvider,
+  key: string
+): Promise<ProviderStatus> {
+  return invoke("save_transcription_key", { provider, key });
 }
 
-export function hasGeminiKey(): Promise<boolean> {
-  return invoke("has_gemini_key");
+export function hasTranscriptionKey(
+  provider: TranscriptionProvider
+): Promise<boolean> {
+  return invoke("has_transcription_key", { provider });
 }
 
-export function deleteGeminiKey(): Promise<void> {
-  return invoke("delete_gemini_key");
+export function deleteTranscriptionKey(
+  provider: TranscriptionProvider
+): Promise<void> {
+  return invoke("delete_transcription_key", { provider });
 }
 
-export function validateGeminiKey(key?: string): Promise<ProviderStatus> {
-  return invoke("validate_gemini_key", key ? { key } : {});
+export function validateTranscriptionKey(
+  provider: TranscriptionProvider,
+  key?: string
+): Promise<ProviderStatus> {
+  return invoke("validate_transcription_key", key ? { provider, key } : { provider });
 }
 
 export function selectSessionsFolder(): Promise<string | null> {
@@ -72,8 +83,11 @@ export function stopRecording(sessionId: string): Promise<SessionSummary> {
   return invoke("stop_recording", { sessionId });
 }
 
-export function transcribeSession(sessionId: string): Promise<SessionSummary> {
-  return invoke("transcribe_session", { sessionId });
+export function transcribeSession(
+  sessionId: string,
+  provider?: TranscriptionProvider
+): Promise<SessionSummary> {
+  return invoke("transcribe_session", provider ? { sessionId, provider } : { sessionId });
 }
 
 export function readTranscript(sessionId: string): Promise<string | null> {

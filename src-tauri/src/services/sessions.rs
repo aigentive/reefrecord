@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::settings::SettingsStore;
+use crate::transcription::types::{TranscriptionProvider, TranscriptionUsage};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -44,6 +45,8 @@ pub struct SessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcription_error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_provider: Option<TranscriptionProvider>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcription_prompt_tokens: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcription_output_tokens: Option<u64>,
@@ -53,6 +56,8 @@ pub struct SessionSummary {
     pub transcription_cost_usd: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcription_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription_usage: Option<TranscriptionUsage>,
     pub sync_status: SyncStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sync_error: Option<String>,
@@ -373,11 +378,13 @@ mod tests {
             system_device_name: None,
             transcription_status: TranscriptionStatus::Complete,
             transcription_error: None,
+            transcription_provider: Some(TranscriptionProvider::Gemini),
             transcription_prompt_tokens: Some(10),
             transcription_output_tokens: Some(5),
             transcription_total_tokens: Some(15),
             transcription_cost_usd: Some(0.001),
             transcription_model: Some("gemini-test".into()),
+            transcription_usage: None,
             sync_status: SyncStatus::NotEnabled,
             sync_error: None,
             transcript_preview: None,

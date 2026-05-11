@@ -37,10 +37,10 @@ const CHIPS: ChipConfig[] = [
     optional: true,
   },
   {
-    key: "gemini",
-    label: "Gemini",
+    key: "parser",
+    label: "Parser",
     icon: <KeyRound size={12} />,
-    pick: (s) => s.gemini,
+    pick: (s) => s.transcription,
   },
   {
     key: "folder",

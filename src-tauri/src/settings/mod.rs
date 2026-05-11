@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
+use crate::transcription::types::TranscriptionProvider;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,14 +14,36 @@ pub struct Settings {
     pub capture_system_audio: bool,
     pub mic_device_selector: Option<String>,
     pub system_audio_device_selector: Option<String>,
+    #[serde(default = "default_transcription_provider")]
+    pub transcription_provider: TranscriptionProvider,
     pub gemini_model: String,
     pub gemini_fallback_model: String,
+    #[serde(default = "default_openai_model")]
+    pub openai_model: String,
+    #[serde(default)]
+    pub openai_fallback_model: String,
+    #[serde(default = "default_deepgram_model")]
+    pub deepgram_model: String,
+    #[serde(default = "default_true")]
+    pub deepgram_smart_format: bool,
+    #[serde(default = "default_true")]
+    pub deepgram_diarize: bool,
+    #[serde(default = "default_true")]
+    pub deepgram_utterances: bool,
     pub chunk_minutes: u32,
     pub language_hint: String,
     pub include_speaker_labels: bool,
     pub include_timestamps: bool,
     pub gemini_input_cost_per_million_usd: f64,
     pub gemini_output_cost_per_million_usd: f64,
+    #[serde(default = "default_openai_cost_per_minute_usd")]
+    pub openai_cost_per_minute_usd: f64,
+    #[serde(default)]
+    pub openai_input_cost_per_million_usd: f64,
+    #[serde(default)]
+    pub openai_output_cost_per_million_usd: f64,
+    #[serde(default)]
+    pub deepgram_cost_per_hour_usd: f64,
     pub github_sync_enabled: bool,
     pub github_repo_url: String,
     pub github_target_folder: String,
@@ -34,8 +57,15 @@ impl Default for Settings {
             capture_system_audio: true,
             mic_device_selector: None,
             system_audio_device_selector: Some("blackhole".to_string()),
+            transcription_provider: TranscriptionProvider::Gemini,
             gemini_model: "gemini-3-flash-preview".to_string(),
             gemini_fallback_model: "gemini-2.5-flash".to_string(),
+            openai_model: "whisper-1".to_string(),
+            openai_fallback_model: String::new(),
+            deepgram_model: "nova-3".to_string(),
+            deepgram_smart_format: true,
+            deepgram_diarize: true,
+            deepgram_utterances: true,
             chunk_minutes: 15,
             language_hint: "Romanian with possible English".to_string(),
             include_speaker_labels: true,
@@ -44,6 +74,10 @@ impl Default for Settings {
             // public pricing. Override in Settings if you switch models.
             gemini_input_cost_per_million_usd: 1.00,
             gemini_output_cost_per_million_usd: 3.00,
+            openai_cost_per_minute_usd: 0.006,
+            openai_input_cost_per_million_usd: 0.0,
+            openai_output_cost_per_million_usd: 0.0,
+            deepgram_cost_per_hour_usd: 0.0,
             github_sync_enabled: false,
             github_repo_url: String::new(),
             github_target_folder: "sessions".to_string(),
@@ -59,14 +93,25 @@ pub struct SettingsInput {
     pub capture_system_audio: Option<bool>,
     pub mic_device_selector: Option<Option<String>>,
     pub system_audio_device_selector: Option<Option<String>>,
+    pub transcription_provider: Option<TranscriptionProvider>,
     pub gemini_model: Option<String>,
     pub gemini_fallback_model: Option<String>,
+    pub openai_model: Option<String>,
+    pub openai_fallback_model: Option<String>,
+    pub deepgram_model: Option<String>,
+    pub deepgram_smart_format: Option<bool>,
+    pub deepgram_diarize: Option<bool>,
+    pub deepgram_utterances: Option<bool>,
     pub chunk_minutes: Option<u32>,
     pub language_hint: Option<String>,
     pub include_speaker_labels: Option<bool>,
     pub include_timestamps: Option<bool>,
     pub gemini_input_cost_per_million_usd: Option<f64>,
     pub gemini_output_cost_per_million_usd: Option<f64>,
+    pub openai_cost_per_minute_usd: Option<f64>,
+    pub openai_input_cost_per_million_usd: Option<f64>,
+    pub openai_output_cost_per_million_usd: Option<f64>,
+    pub deepgram_cost_per_hour_usd: Option<f64>,
     pub github_sync_enabled: Option<bool>,
     pub github_repo_url: Option<String>,
     pub github_target_folder: Option<String>,
@@ -128,11 +173,32 @@ impl SettingsStore {
         if let Some(v) = input.system_audio_device_selector {
             current.system_audio_device_selector = v;
         }
+        if let Some(v) = input.transcription_provider {
+            current.transcription_provider = v;
+        }
         if let Some(v) = input.gemini_model {
-            current.gemini_model = v;
+            current.gemini_model = normalize_model(v, &current.gemini_model);
         }
         if let Some(v) = input.gemini_fallback_model {
-            current.gemini_fallback_model = v;
+            current.gemini_fallback_model = normalize_model(v, &current.gemini_fallback_model);
+        }
+        if let Some(v) = input.openai_model {
+            current.openai_model = normalize_model(v, &current.openai_model);
+        }
+        if let Some(v) = input.openai_fallback_model {
+            current.openai_fallback_model = v.trim().to_string();
+        }
+        if let Some(v) = input.deepgram_model {
+            current.deepgram_model = normalize_model(v, &current.deepgram_model);
+        }
+        if let Some(v) = input.deepgram_smart_format {
+            current.deepgram_smart_format = v;
+        }
+        if let Some(v) = input.deepgram_diarize {
+            current.deepgram_diarize = v;
+        }
+        if let Some(v) = input.deepgram_utterances {
+            current.deepgram_utterances = v;
         }
         if let Some(v) = input.chunk_minutes {
             current.chunk_minutes = v.clamp(1, 60);
@@ -151,6 +217,18 @@ impl SettingsStore {
         }
         if let Some(v) = input.gemini_output_cost_per_million_usd {
             current.gemini_output_cost_per_million_usd = v.max(0.0);
+        }
+        if let Some(v) = input.openai_cost_per_minute_usd {
+            current.openai_cost_per_minute_usd = v.max(0.0);
+        }
+        if let Some(v) = input.openai_input_cost_per_million_usd {
+            current.openai_input_cost_per_million_usd = v.max(0.0);
+        }
+        if let Some(v) = input.openai_output_cost_per_million_usd {
+            current.openai_output_cost_per_million_usd = v.max(0.0);
+        }
+        if let Some(v) = input.deepgram_cost_per_hour_usd {
+            current.deepgram_cost_per_hour_usd = v.max(0.0);
         }
         if let Some(v) = input.github_sync_enabled {
             current.github_sync_enabled = v;
@@ -204,6 +282,35 @@ pub fn resolve_config_dir(app: &AppHandle) -> AppResult<PathBuf> {
         .app_config_dir()
         .map_err(|e| AppError::msg(format!("no app config dir: {e}")))?;
     Ok(dir)
+}
+
+fn normalize_model(value: String, fallback: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn default_transcription_provider() -> TranscriptionProvider {
+    TranscriptionProvider::Gemini
+}
+
+fn default_openai_model() -> String {
+    "whisper-1".to_string()
+}
+
+fn default_deepgram_model() -> String {
+    "nova-3".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_openai_cost_per_minute_usd() -> f64 {
+    0.006
 }
 
 #[cfg(test)]
