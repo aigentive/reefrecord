@@ -1,5 +1,6 @@
 .env
 keys
+.claude/
 /sessions/
 __pycache__/
 .progress.md
@@ -11,5 +12,8 @@ src-tauri/target/
 src-tauri/gen/
 frontend/dist/
 frontend/node_modules/
+frontend/playwright-report/
+frontend/test-results/
+release/
 
 tsconfig.tsbuildinfo

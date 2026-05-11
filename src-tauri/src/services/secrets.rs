@@ -103,9 +103,9 @@ fn decrypt(blob: &[u8]) -> AppResult<Vec<u8>> {
     let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
     let cipher = Aes256Gcm::new(key);
     let nonce = Nonce::from_slice(nonce_bytes);
-    cipher
-        .decrypt(nonce, ct)
-        .map_err(|_| AppError::msg("could not decrypt secrets — key was saved on a different machine or user"))
+    cipher.decrypt(nonce, ct).map_err(|_| {
+        AppError::msg("could not decrypt secrets — key was saved on a different machine or user")
+    })
 }
 
 fn read_record() -> AppResult<Option<Vec<u8>>> {
@@ -184,4 +184,32 @@ pub fn delete_gemini_key() -> AppResult<()> {
 
 pub fn has_gemini_key() -> bool {
     matches!(read_gemini_key(), Ok(Some(_)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gemini_key_round_trip_is_encrypted_and_deletable() {
+        let dir = tempfile::tempdir().unwrap();
+        set_config_dir(dir.path().to_path_buf());
+
+        assert!(!has_gemini_key());
+
+        save_gemini_key("  AIzaSy_secret  ").unwrap();
+        assert_eq!(read_gemini_key().unwrap().as_deref(), Some("AIzaSy_secret"));
+        assert!(has_gemini_key());
+
+        let raw = std::fs::read(secret_path().unwrap()).unwrap();
+        assert!(!String::from_utf8_lossy(&raw).contains("AIzaSy_secret"));
+
+        delete_gemini_key().unwrap();
+        assert!(!has_gemini_key());
+    }
+
+    #[test]
+    fn empty_gemini_key_is_rejected() {
+        assert!(save_gemini_key("   ").is_err());
+    }
 }

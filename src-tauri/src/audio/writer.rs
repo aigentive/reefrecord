@@ -45,3 +45,35 @@ pub fn mix_mono_i16(a: &[i16], b: &[i16]) -> Vec<i16> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mix_truncates_to_shorter_buffer_and_clamps() {
+        let out = mix_mono_i16(&[20_000, -20_000, 1, 99], &[20_000, -20_000, -4]);
+
+        assert_eq!(out, vec![i16::MAX, i16::MIN, -3]);
+    }
+
+    #[test]
+    fn writes_mono_i16_wav_with_target_spec() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nested").join("session.wav");
+
+        write_wav_mono_i16(&path, &[0, 123, -456]).unwrap();
+
+        let mut reader = hound::WavReader::open(&path).unwrap();
+        let spec = reader.spec();
+        let samples = reader
+            .samples::<i16>()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(spec.channels, TARGET_CHANNELS);
+        assert_eq!(spec.sample_rate, TARGET_RATE);
+        assert_eq!(spec.bits_per_sample, 16);
+        assert_eq!(samples, vec![0, 123, -456]);
+    }
+}

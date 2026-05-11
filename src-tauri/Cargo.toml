@@ -3,6 +3,7 @@ name = "reef-recorder"
 version = "0.1.0"
 description = "Reef Recorder — desktop recorder and Gemini transcription"
 authors = ["Reef Recorder"]
+license = "Apache-2.0"
 edition = "2021"
 
 [lib]

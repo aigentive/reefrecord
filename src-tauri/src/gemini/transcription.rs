@@ -246,3 +246,123 @@ fn write_chunk_wav(path: &Path, samples: &[i16], spec: hound::WavSpec) -> AppRes
         .map_err(|e| AppError::Audio(format!("chunk finalize: {e}")))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_test_wav(path: &Path, sample_rate: u32, seconds: u32) {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(path, spec).unwrap();
+        for idx in 0..sample_rate * seconds {
+            writer.write_sample((idx % 128) as i16).unwrap();
+        }
+        writer.finalize().unwrap();
+    }
+
+    #[test]
+    fn prompt_reflects_language_offset_and_format_options() {
+        let full = build_prompt(65, "Romanian and English", true, true);
+        assert!(full.contains("primarily in Romanian and English"));
+        assert!(full.contains("chunk starts at 01:05"));
+        assert!(full.contains("[MM:SS] [Speaker N]"));
+
+        let speaker_only = build_prompt(0, "", true, false);
+        assert!(speaker_only.contains("[Speaker N]"));
+        assert!(speaker_only.contains("Do not include timestamps."));
+        assert!(!speaker_only.contains("Timing note"));
+
+        let timestamp_only = build_prompt(0, "", false, true);
+        assert!(timestamp_only.contains("No speaker labels."));
+
+        let plain = build_prompt(0, "", false, false);
+        assert!(plain.contains("Plain flowing verbatim text."));
+    }
+
+    #[test]
+    fn split_wav_keeps_short_audio_as_single_original_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let wav = dir.path().join("short.wav");
+        write_test_wav(&wav, 8_000, 5);
+
+        let chunks = split_wav_if_needed(&wav, 1).unwrap();
+
+        assert_eq!(chunks, vec![(wav, 0)]);
+    }
+
+    #[test]
+    fn split_wav_writes_chunks_with_offsets_when_over_buffer() {
+        let dir = tempfile::tempdir().unwrap();
+        let wav = dir.path().join("long.wav");
+        write_test_wav(&wav, 8_000, 121);
+
+        let chunks = split_wav_if_needed(&wav, 1).unwrap();
+        let offsets = chunks.iter().map(|(_, offset)| *offset).collect::<Vec<_>>();
+
+        assert_eq!(offsets, vec![0, 60, 120]);
+        for (path, _) in &chunks {
+            assert!(path.exists());
+        }
+        for (path, _) in chunks {
+            if path != wav {
+                std::fs::remove_file(path).unwrap();
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the existing Reef Recorder Gemini key and network access"]
+    async fn real_gemini_transcribes_silent_wav_with_existing_key() {
+        let config_dir = real_app_config_dir();
+        crate::services::secrets::set_config_dir(config_dir.clone());
+        let key = crate::services::secrets::read_gemini_key()
+            .unwrap_or_else(|e| {
+                panic!(
+                    "could not read Gemini key from {}: {e}",
+                    config_dir.display()
+                )
+            })
+            .unwrap_or_else(|| panic!("no Gemini key found in {}", config_dir.display()));
+
+        let dir = tempfile::tempdir().unwrap();
+        let wav = dir.path().join("silent.wav");
+        write_test_wav(&wav, 16_000, 2);
+
+        let client = GeminiClient::new(key).unwrap();
+        let outcome = transcribe(
+            &client,
+            TranscriptionJob {
+                wav_path: wav,
+                primary_model: "gemini-3-flash-preview".into(),
+                fallback_model: "gemini-2.5-flash".into(),
+                chunk_minutes: 15,
+                language_hint: "English".into(),
+                include_speaker_labels: false,
+                include_timestamps: false,
+            },
+        )
+        .await
+        .expect("real Gemini transcription request failed");
+
+        assert!(!outcome.text.trim().is_empty());
+        assert!(
+            outcome.usage.prompt_tokens > 0
+                || outcome.usage.output_tokens > 0
+                || outcome.usage.total_tokens > 0
+        );
+    }
+
+    fn real_app_config_dir() -> PathBuf {
+        if let Ok(path) = std::env::var("REEF_RECORDER_CONFIG_DIR") {
+            return PathBuf::from(path);
+        }
+        dirs::config_dir()
+            .expect("no user config directory available")
+            .join("com.aigentive.reefrecord")
+    }
+}

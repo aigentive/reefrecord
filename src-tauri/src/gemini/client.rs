@@ -362,3 +362,70 @@ fn truncate(s: &str, n: usize) -> String {
         format!("{}…", &s[..n])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_rejects_empty_keys() {
+        assert!(GeminiClient::new("".into()).is_err());
+        assert!(GeminiClient::new("   ".into()).is_err());
+        assert!(GeminiClient::new("AIzaSy_test".into()).is_ok());
+    }
+
+    #[test]
+    fn usage_add_sums_each_counter() {
+        let a = GeminiUsage {
+            prompt_tokens: 1,
+            output_tokens: 2,
+            total_tokens: 3,
+        };
+        let b = GeminiUsage {
+            prompt_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 30,
+        };
+
+        let out = a.add(b);
+
+        assert_eq!(out.prompt_tokens, 11);
+        assert_eq!(out.output_tokens, 22);
+        assert_eq!(out.total_tokens, 33);
+    }
+
+    #[test]
+    fn audio_parts_serialize_to_gemini_payload_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let wav = dir.path().join("sample.wav");
+        std::fs::write(&wav, [0u8, 1, 2, 3]).unwrap();
+
+        let inline = build_inline_audio_part(&wav).unwrap();
+        let inline_json = serde_json::to_value(inline).unwrap();
+        assert_eq!(
+            inline_json["inline_data"]["mime_type"].as_str(),
+            Some("audio/wav")
+        );
+        assert_eq!(
+            inline_json["inline_data"]["data"].as_str(),
+            Some("AAECAw==")
+        );
+
+        let file = build_file_audio_part("files/abc".into());
+        let file_json = serde_json::to_value(file).unwrap();
+        assert_eq!(
+            file_json["file_data"]["mime_type"].as_str(),
+            Some("audio/wav")
+        );
+        assert_eq!(
+            file_json["file_data"]["file_uri"].as_str(),
+            Some("files/abc")
+        );
+    }
+
+    #[test]
+    fn truncate_preserves_short_text_and_shortens_long_text() {
+        assert_eq!(truncate("short", 10), "short");
+        assert_eq!(truncate("abcdef", 3), "abc…");
+    }
+}

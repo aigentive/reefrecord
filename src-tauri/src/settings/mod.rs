@@ -205,3 +205,90 @@ pub fn resolve_config_dir(app: &AppHandle) -> AppResult<PathBuf> {
         .map_err(|e| AppError::msg(format!("no app config dir: {e}")))?;
     Ok(dir)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_missing_or_invalid_settings_returns_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SettingsStore::load_or_default(dir.path());
+
+        assert_eq!(store.get().gemini_model, "gemini-3-flash-preview");
+        assert_eq!(store.get().github_target_folder, "sessions");
+        assert!(dir.path().exists());
+
+        std::fs::write(dir.path().join("settings.json"), "{bad json").unwrap();
+        let invalid = SettingsStore::load_or_default(dir.path());
+        assert_eq!(
+            invalid.get().language_hint,
+            "Romanian with possible English"
+        );
+    }
+
+    #[test]
+    fn update_applies_normalization_and_persists_to_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SettingsStore::load_or_default(dir.path());
+
+        let mut input = SettingsInput::default();
+        input.sessions_dir = Some(Some("/tmp/reef sessions".into()));
+        input.capture_system_audio = Some(false);
+        input.mic_device_selector = Some(Some(" USB Mic ".into()));
+        input.system_audio_device_selector = Some(None);
+        input.gemini_model = Some("primary".into());
+        input.gemini_fallback_model = Some("fallback".into());
+        input.chunk_minutes = Some(999);
+        input.language_hint = Some("Romanian".into());
+        input.include_speaker_labels = Some(false);
+        input.include_timestamps = Some(false);
+        input.gemini_input_cost_per_million_usd = Some(-1.0);
+        input.gemini_output_cost_per_million_usd = Some(4.5);
+        input.github_sync_enabled = Some(true);
+        input.github_repo_url = Some("  git@github.com:org/repo.git  ".into());
+        input.github_target_folder = Some("/meetings/".into());
+        input.git_lfs_enabled = Some(false);
+
+        let saved = store.update(input).unwrap();
+
+        assert_eq!(saved.sessions_dir.as_deref(), Some("/tmp/reef sessions"));
+        assert!(!saved.capture_system_audio);
+        assert_eq!(saved.mic_device_selector.as_deref(), Some(" USB Mic "));
+        assert_eq!(saved.system_audio_device_selector, None);
+        assert_eq!(saved.gemini_model, "primary");
+        assert_eq!(saved.gemini_fallback_model, "fallback");
+        assert_eq!(saved.chunk_minutes, 60);
+        assert_eq!(saved.language_hint, "Romanian");
+        assert!(!saved.include_speaker_labels);
+        assert!(!saved.include_timestamps);
+        assert_eq!(saved.gemini_input_cost_per_million_usd, 0.0);
+        assert_eq!(saved.gemini_output_cost_per_million_usd, 4.5);
+        assert!(saved.github_sync_enabled);
+        assert_eq!(saved.github_repo_url, "git@github.com:org/repo.git");
+        assert_eq!(saved.github_target_folder, "meetings");
+        assert!(!saved.git_lfs_enabled);
+
+        let raw = std::fs::read_to_string(store.path()).unwrap();
+        assert!(raw.contains("\"githubRepoUrl\": \"git@github.com:org/repo.git\""));
+        assert!(!raw.contains("gemini_api_key"));
+
+        let mut clear = SettingsInput::default();
+        clear.github_target_folder = Some("   ".into());
+        clear.chunk_minutes = Some(0);
+        let saved = store.update(clear).unwrap();
+        assert_eq!(saved.github_target_folder, "sessions");
+        assert_eq!(saved.chunk_minutes, 1);
+    }
+
+    #[test]
+    fn set_sessions_dir_uses_settings_update_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SettingsStore::load_or_default(dir.path());
+
+        let saved = store.set_sessions_dir("/tmp/next".into()).unwrap();
+
+        assert_eq!(saved.sessions_dir.as_deref(), Some("/tmp/next"));
+        assert_eq!(store.get().sessions_dir.as_deref(), Some("/tmp/next"));
+    }
+}

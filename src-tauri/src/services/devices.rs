@@ -8,8 +8,11 @@ pub const BLACKHOLE_FRAGMENTS: &[&str] = &["blackhole", "black hole"];
 #[cfg(target_os = "macos")]
 const HAL_PLUGIN_DIR: &str = "/Library/Audio/Plug-Ins/HAL";
 #[cfg(target_os = "macos")]
-const BLACKHOLE_DRIVER_BUNDLES: &[&str] =
-    &["BlackHole2ch.driver", "BlackHole16ch.driver", "BlackHole64ch.driver"];
+const BLACKHOLE_DRIVER_BUNDLES: &[&str] = &[
+    "BlackHole2ch.driver",
+    "BlackHole16ch.driver",
+    "BlackHole64ch.driver",
+];
 
 /// Returns true if a BlackHole `.driver` bundle is installed on disk even when
 /// CoreAudio hasn't loaded it yet. Matches the hint shown by `recorder.py`:
@@ -79,7 +82,9 @@ pub fn name_is_blackhole(name: &str) -> bool {
 }
 
 pub fn find_blackhole_device(devices: &[AudioDevice]) -> Option<&AudioDevice> {
-    devices.iter().find(|d| d.is_blackhole && d.input_channels > 0)
+    devices
+        .iter()
+        .find(|d| d.is_blackhole && d.input_channels > 0)
 }
 
 /// Resolve a device by numeric index (position in list) or case-insensitive name fragment.
@@ -95,5 +100,64 @@ pub fn resolve_device_selector<'a>(
         return devices.get(idx);
     }
     let lower = sel.to_lowercase();
-    devices.iter().find(|d| d.name.to_lowercase().contains(&lower))
+    devices
+        .iter()
+        .find(|d| d.name.to_lowercase().contains(&lower))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn device(name: &str, channels: u32, is_default: bool) -> AudioDevice {
+        AudioDevice {
+            id: name.to_string(),
+            name: name.to_string(),
+            input_channels: channels,
+            is_default,
+            is_blackhole: name_is_blackhole(name),
+        }
+    }
+
+    #[test]
+    fn detects_blackhole_names_case_insensitively() {
+        assert!(name_is_blackhole("BlackHole 2ch"));
+        assert!(name_is_blackhole("Black Hole 16ch"));
+        assert!(name_is_blackhole("my BLACKHOLE aggregate"));
+        assert!(!name_is_blackhole("Studio Microphone"));
+    }
+
+    #[test]
+    fn finds_blackhole_only_when_it_has_input_channels() {
+        let devices = vec![
+            device("BlackHole muted", 0, false),
+            device("Studio Mic", 1, true),
+            device("BlackHole 2ch", 2, false),
+        ];
+
+        assert_eq!(
+            find_blackhole_device(&devices).map(|d| d.name.as_str()),
+            Some("BlackHole 2ch")
+        );
+    }
+
+    #[test]
+    fn resolves_selector_by_index_or_name_fragment() {
+        let devices = vec![
+            device("Built-in Mic", 1, true),
+            device("USB Studio Mic", 2, false),
+        ];
+
+        assert_eq!(
+            resolve_device_selector(&devices, Some("1")).map(|d| d.name.as_str()),
+            Some("USB Studio Mic")
+        );
+        assert_eq!(
+            resolve_device_selector(&devices, Some("studio")).map(|d| d.name.as_str()),
+            Some("USB Studio Mic")
+        );
+        assert!(resolve_device_selector(&devices, Some("")).is_none());
+        assert!(resolve_device_selector(&devices, None).is_none());
+        assert!(resolve_device_selector(&devices, Some("9")).is_none());
+    }
 }

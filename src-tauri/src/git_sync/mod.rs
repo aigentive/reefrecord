@@ -50,7 +50,11 @@ pub fn validate(settings: &Settings) -> GitSyncStatus {
         git_lfs_installed,
         repo_url_valid,
         target_folder_safe,
-        message: if msgs.is_empty() { None } else { Some(msgs.join("; ")) },
+        message: if msgs.is_empty() {
+            None
+        } else {
+            Some(msgs.join("; "))
+        },
     }
 }
 
@@ -88,7 +92,9 @@ pub fn push_session(
         return Err(AppError::Invalid("GitHub repository URL is empty.".into()));
     }
     if !is_safe_relative_path(&settings.github_target_folder) {
-        return Err(AppError::Invalid("GitHub target folder is not safe.".into()));
+        return Err(AppError::Invalid(
+            "GitHub target folder is not safe.".into(),
+        ));
     }
 
     let validation = validate(settings);
@@ -105,7 +111,11 @@ pub fn push_session(
         .map_err(|e| AppError::Git(format!("cannot create tempdir: {e}")))?;
     let tmp_path = tmp.path().to_path_buf();
 
-    run_git(&tmp_path, &["clone", "--depth", "1", &settings.github_repo_url, "."], true)?;
+    run_git(
+        &tmp_path,
+        &["clone", "--depth", "1", &settings.github_repo_url, "."],
+        true,
+    )?;
 
     if settings.git_lfs_enabled {
         run_git(&tmp_path, &["lfs", "install"], false)?;
@@ -130,14 +140,18 @@ pub fn push_session(
     if let Some(tp) = &session.transcript_path {
         let src = Path::new(tp);
         if src.exists() {
-            let dst = target.join(src.file_name().unwrap_or_else(|| std::ffi::OsStr::new("transcript.txt")));
+            let dst = target.join(
+                src.file_name()
+                    .unwrap_or_else(|| std::ffi::OsStr::new("transcript.txt")),
+            );
             std::fs::copy(src, &dst).map_err(|e| AppError::Git(format!("copy transcript: {e}")))?;
         }
     }
     let meta_path = session.metadata_path(sessions_dir);
     if meta_path.exists() {
         let dst = target.join(meta_path.file_name().unwrap());
-        std::fs::copy(&meta_path, &dst).map_err(|e| AppError::Git(format!("copy metadata: {e}")))?;
+        std::fs::copy(&meta_path, &dst)
+            .map_err(|e| AppError::Git(format!("copy metadata: {e}")))?;
     }
 
     if settings.git_lfs_enabled {
@@ -191,7 +205,9 @@ fn run_git_capture(cwd: &PathBuf, args: &[&str], allow_long: bool) -> AppResult<
             cleaned
         };
         // Map common failures to clearer errors.
-        let msg = if short.contains("could not read Username") || short.contains("Authentication failed") {
+        let msg = if short.contains("could not read Username")
+            || short.contains("Authentication failed")
+        {
             "authentication failed — check git credentials".to_string()
         } else if short.contains("Repository not found") || short.contains("does not exist") {
             "repository not found or no access".to_string()
@@ -266,7 +282,8 @@ fn redact_url(text: &str) -> String {
 
 #[cfg(test)]
 mod redact_tests {
-    use super::redact_url;
+    use super::{is_safe_relative_path, redact_url, validate};
+    use crate::settings::Settings;
 
     #[test]
     fn strips_userinfo_from_https() {
@@ -282,9 +299,45 @@ mod redact_tests {
 
     #[test]
     fn handles_multiple_urls() {
-        let red = redact_url(
-            "before https://u:p@host.com/x and after git@github.com:org/repo.git",
-        );
+        let red = redact_url("before https://u:p@host.com/x and after git@github.com:org/repo.git");
         assert!(red.contains("***@host.com/x"));
+    }
+
+    #[test]
+    fn safe_relative_path_rejects_empty_absolute_parent_and_credentials_shape() {
+        assert!(is_safe_relative_path("sessions"));
+        assert!(is_safe_relative_path("team/meetings"));
+        assert!(!is_safe_relative_path(""));
+        assert!(!is_safe_relative_path("   "));
+        assert!(!is_safe_relative_path("/sessions"));
+        assert!(!is_safe_relative_path("\\sessions"));
+        assert!(!is_safe_relative_path("../sessions"));
+        assert!(!is_safe_relative_path("sessions/../other"));
+        assert!(!is_safe_relative_path("C:\\sessions"));
+    }
+
+    #[test]
+    fn validate_reports_repo_and_target_folder_state_independently() {
+        let settings = Settings {
+            github_sync_enabled: true,
+            github_repo_url: String::new(),
+            github_target_folder: "../sessions".into(),
+            ..Settings::default()
+        };
+
+        let status = validate(&settings);
+
+        assert!(!status.repo_url_valid);
+        assert!(!status.target_folder_safe);
+        assert!(status
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("repository URL is empty"));
+        assert!(status
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("target folder is not a safe relative path"));
     }
 }

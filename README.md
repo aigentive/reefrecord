@@ -49,6 +49,21 @@ Produces an unsigned macOS binary at `src-tauri/target/release/reef-recorder`.
 
 For a signed / notarized DMG, configure `tauri.conf.json` → `bundle.macOS.signingIdentity` and run `tauri build` without `--no-bundle`.
 
+## Tests
+
+```bash
+cd src-tauri && cargo test
+cd frontend && npm run build
+cd frontend && npm run test:e2e
+```
+
+The real Gemini integration test is opt-in because it uses the saved app key
+and makes a live API request:
+
+```bash
+npm run test:gemini
+```
+
 ## Configuration
 
 | Setting | Where | Default |
@@ -96,3 +111,7 @@ See `CLAUDE.md` for conventions, Rust `Send/Sync` gotchas, and how commands flow
 ## Spec
 
 `.plans/00-product-spec.md` through `.plans/05-polish-release.md` contain the frozen product spec. Read them before contributing feature changes.
+
+## License
+
+Apache License 2.0. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
