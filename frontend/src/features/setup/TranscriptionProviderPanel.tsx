@@ -11,6 +11,10 @@ import {
   saveTranscriptionKey,
   validateTranscriptionKey,
 } from "../../api/bridge";
+import {
+  modelOptionsForProvider,
+  modelOptionsWithCurrent,
+} from "./modelOptions";
 
 type Props = {
   status: AppStatus | null;
@@ -57,6 +61,10 @@ export function TranscriptionProviderPanel({
   }, [settings, provider]);
 
   const providerStatus = status?.providers?.[provider];
+  const modelOptions = modelOptionsWithCurrent(
+    modelOptionsForProvider(provider),
+    model
+  );
   const hasKey =
     providerStatus?.state === "ready" || providerStatus?.state === "warning";
   const canValidate = hasKey || key.trim().length > 0;
@@ -182,14 +190,18 @@ export function TranscriptionProviderPanel({
           Model
         </label>
         <div className="row">
-          <input
+          <select
             id="parser-model"
             className="input"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder={defaultModel(provider)}
-            spellCheck={false}
-          />
+          >
+            {modelOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
           <button type="button" className="btn" onClick={saveModel}>
             Save
           </button>
@@ -293,17 +305,6 @@ function modelInput(
       return { openaiModel: model };
     case "deepgram":
       return { deepgramModel: model };
-  }
-}
-
-function defaultModel(provider: TranscriptionProvider): string {
-  switch (provider) {
-    case "gemini":
-      return "gemini-3-flash-preview";
-    case "openai":
-      return "whisper-1";
-    case "deepgram":
-      return "nova-3";
   }
 }
 

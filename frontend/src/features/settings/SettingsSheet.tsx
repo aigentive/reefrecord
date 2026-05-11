@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { Settings } from "../../api/types";
 import { saveSettings } from "../../api/bridge";
+import {
+  DEEPGRAM_MODEL_OPTIONS,
+  GEMINI_MODEL_OPTIONS,
+  OPENAI_FALLBACK_MODEL_OPTIONS,
+  OPENAI_MODEL_OPTIONS,
+  modelOptionsWithCurrent,
+} from "../setup/modelOptions";
 
 type Props = {
   settings: Settings;
@@ -137,11 +144,11 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                   <label className="field-label" htmlFor="s-gemini-model">
                     Gemini model
                   </label>
-                  <input
+                  <ModelSelect
                     id="s-gemini-model"
-                    className="input"
                     value={draft.geminiModel}
-                    onChange={(e) => set("geminiModel", e.target.value)}
+                    options={GEMINI_MODEL_OPTIONS}
+                    onChange={(value) => set("geminiModel", value)}
                   />
                 </div>
 
@@ -149,15 +156,16 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                   <label className="field-label" htmlFor="s-gemini-fallback">
                     Gemini fallback
                   </label>
-                  <input
+                  <ModelSelect
                     id="s-gemini-fallback"
-                    className="input"
                     value={draft.geminiFallbackModel}
-                    onChange={(e) => set("geminiFallbackModel", e.target.value)}
+                    options={GEMINI_MODEL_OPTIONS}
+                    onChange={(value) => set("geminiFallbackModel", value)}
                   />
                 </div>
               </>
             )}
+
 
             {draft.transcriptionProvider === "openai" && (
               <>
@@ -165,11 +173,11 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                   <label className="field-label" htmlFor="s-openai-model">
                     OpenAI model
                   </label>
-                  <input
+                  <ModelSelect
                     id="s-openai-model"
-                    className="input"
                     value={draft.openaiModel}
-                    onChange={(e) => set("openaiModel", e.target.value)}
+                    options={OPENAI_MODEL_OPTIONS}
+                    onChange={(value) => set("openaiModel", value)}
                   />
                 </div>
 
@@ -177,12 +185,11 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                   <label className="field-label" htmlFor="s-openai-fallback">
                     OpenAI fallback
                   </label>
-                  <input
+                  <ModelSelect
                     id="s-openai-fallback"
-                    className="input"
                     value={draft.openaiFallbackModel}
-                    onChange={(e) => set("openaiFallbackModel", e.target.value)}
-                    placeholder="Optional"
+                    options={OPENAI_FALLBACK_MODEL_OPTIONS}
+                    onChange={(value) => set("openaiFallbackModel", value)}
                   />
                 </div>
               </>
@@ -194,11 +201,11 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                   <label className="field-label" htmlFor="s-deepgram-model">
                     Deepgram model
                   </label>
-                  <input
+                  <ModelSelect
                     id="s-deepgram-model"
-                    className="input"
                     value={draft.deepgramModel}
-                    onChange={(e) => set("deepgramModel", e.target.value)}
+                    options={DEEPGRAM_MODEL_OPTIONS}
+                    onChange={(value) => set("deepgramModel", value)}
                   />
                 </div>
 
@@ -405,6 +412,33 @@ function NumberField({
         onChange={(e) => onChange(Number(e.target.value) || 0)}
       />
     </div>
+  );
+}
+
+function ModelSelect({
+  id,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      id={id}
+      className="input"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {modelOptionsWithCurrent(options, value).map((option) => (
+        <option key={option.value || "none"} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
