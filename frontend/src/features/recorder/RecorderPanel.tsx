@@ -71,6 +71,7 @@ export function RecorderPanel({
 
   async function doStop() {
     if (!sessionId) return;
+    setError(null);
     setPhase("stopping");
     try {
       const summary = await stopRecording(sessionId);
@@ -80,14 +81,19 @@ export function RecorderPanel({
       try {
         const result = await transcribeSession(sessionId);
         onSessionUpdated(result);
+        setPhase("complete");
       } catch (e) {
+        const message = String(e);
         onSessionUpdated({
           ...summary,
           transcriptionStatus: "failed",
-          transcriptionError: String(e),
+          transcriptionError: message,
+          transcriptionProvider:
+            settings?.transcriptionProvider ?? summary.transcriptionProvider,
         });
+        setError(message);
+        setPhase("failed");
       }
-      setPhase("complete");
       setSessionId(null);
       setElapsed(0);
       startRef.current = null;

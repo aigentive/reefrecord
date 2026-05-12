@@ -49,19 +49,35 @@ pub async fn transcribe_session(
 ) -> AppResult<SessionSummary> {
     let settings = state.settings.get();
     let provider = provider.unwrap_or(settings.transcription_provider);
-    let key = secrets::read_transcription_key(provider)?
-        .ok_or_else(|| AppError::Invalid(format!("No {} API key saved.", provider.label())))?;
     let mut summary = state
         .sessions
         .get(&session_id)
         .ok_or_else(|| AppError::NotFound(format!("session {session_id} not found")))?;
 
+    let key = match secrets::read_transcription_key(provider) {
+        Ok(Some(key)) => key,
+        Ok(None) => {
+            return fail_transcription_preflight(
+                &state,
+                summary,
+                provider,
+                AppError::Invalid(format!("No {} API key saved.", provider.label())),
+            );
+        }
+        Err(e) => return fail_transcription_preflight(&state, summary, provider, e),
+    };
+
     let wav_path = match summary.wav_path.clone() {
         Some(p) if std::path::Path::new(&p).exists() => std::path::PathBuf::from(p),
         _ => {
-            return Err(AppError::Invalid(
-                "WAV file is no longer on disk. Clear the session and re-record.".into(),
-            ));
+            return fail_transcription_preflight(
+                &state,
+                summary,
+                provider,
+                AppError::Invalid(
+                    "WAV file is no longer on disk. Clear the session and re-record.".into(),
+                ),
+            );
         }
     };
 
@@ -108,6 +124,25 @@ pub async fn transcribe_session(
             Err(e)
         }
     }
+}
+
+fn fail_transcription_preflight(
+    state: &State<'_, AppState>,
+    mut summary: SessionSummary,
+    provider: TranscriptionProvider,
+    error: AppError,
+) -> AppResult<SessionSummary> {
+    summary.transcription_status = TranscriptionStatus::Failed;
+    summary.transcription_error = Some(error.to_string());
+    summary.transcription_prompt_tokens = None;
+    summary.transcription_output_tokens = None;
+    summary.transcription_total_tokens = None;
+    summary.transcription_cost_usd = None;
+    summary.transcription_model = None;
+    summary.transcription_provider = Some(provider);
+    summary.transcription_usage = None;
+    state.sessions.upsert(summary)?;
+    Err(error)
 }
 
 fn set_legacy_usage_fields(summary: &mut SessionSummary, usage: &TranscriptionUsage) {

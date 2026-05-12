@@ -25,7 +25,18 @@ pub fn save_transcription_key(provider: TranscriptionProvider, key: &str) -> App
             provider.label()
         )));
     }
-    entry(provider)?.set_password(key).map_err(keyring_error)
+    entry(provider)?.set_password(key).map_err(keyring_error)?;
+    match read_transcription_key(provider)? {
+        Some(saved) if saved == key => Ok(()),
+        Some(_) => Err(AppError::Invalid(format!(
+            "{} key was saved but did not round-trip from the credential store.",
+            provider.label()
+        ))),
+        None => Err(AppError::Invalid(format!(
+            "{} key was not readable after saving.",
+            provider.label()
+        ))),
+    }
 }
 
 pub fn read_transcription_key(provider: TranscriptionProvider) -> AppResult<Option<String>> {
