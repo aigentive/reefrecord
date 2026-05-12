@@ -4,6 +4,7 @@ use std::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::transcription::types::TranscriptionProvider;
 
@@ -16,6 +17,8 @@ pub struct Settings {
     pub system_audio_device_selector: Option<String>,
     #[serde(default = "default_transcription_provider")]
     pub transcription_provider: TranscriptionProvider,
+    #[serde(default = "default_audio_storage_format")]
+    pub audio_storage_format: AudioFormat,
     pub gemini_model: String,
     pub gemini_fallback_model: String,
     #[serde(default = "default_openai_model")]
@@ -58,6 +61,7 @@ impl Default for Settings {
             mic_device_selector: None,
             system_audio_device_selector: Some("blackhole".to_string()),
             transcription_provider: TranscriptionProvider::Gemini,
+            audio_storage_format: AudioFormat::Flac,
             gemini_model: "gemini-3-flash-preview".to_string(),
             gemini_fallback_model: "gemini-2.5-flash".to_string(),
             openai_model: "whisper-1".to_string(),
@@ -94,6 +98,7 @@ pub struct SettingsInput {
     pub mic_device_selector: Option<Option<String>>,
     pub system_audio_device_selector: Option<Option<String>>,
     pub transcription_provider: Option<TranscriptionProvider>,
+    pub audio_storage_format: Option<AudioFormat>,
     pub gemini_model: Option<String>,
     pub gemini_fallback_model: Option<String>,
     pub openai_model: Option<String>,
@@ -175,6 +180,9 @@ impl SettingsStore {
         }
         if let Some(v) = input.transcription_provider {
             current.transcription_provider = v;
+        }
+        if let Some(v) = input.audio_storage_format {
+            current.audio_storage_format = v;
         }
         if let Some(v) = input.gemini_model {
             current.gemini_model = normalize_model(v, &current.gemini_model);
@@ -299,6 +307,10 @@ fn default_transcription_provider() -> TranscriptionProvider {
     TranscriptionProvider::Gemini
 }
 
+fn default_audio_storage_format() -> AudioFormat {
+    AudioFormat::Flac
+}
+
 fn default_openai_model() -> String {
     "whisper-1".to_string()
 }
@@ -326,6 +338,7 @@ mod tests {
 
         assert_eq!(store.get().gemini_model, "gemini-3-flash-preview");
         assert_eq!(store.get().github_target_folder, "sessions");
+        assert_eq!(store.get().audio_storage_format, AudioFormat::Flac);
         assert!(dir.path().exists());
 
         std::fs::write(dir.path().join("settings.json"), "{bad json").unwrap();
@@ -346,6 +359,7 @@ mod tests {
             capture_system_audio: Some(false),
             mic_device_selector: Some(Some(" USB Mic ".into())),
             system_audio_device_selector: Some(None),
+            audio_storage_format: Some(AudioFormat::Wav),
             gemini_model: Some("primary".into()),
             gemini_fallback_model: Some("fallback".into()),
             chunk_minutes: Some(999),
@@ -367,6 +381,7 @@ mod tests {
         assert!(!saved.capture_system_audio);
         assert_eq!(saved.mic_device_selector.as_deref(), Some(" USB Mic "));
         assert_eq!(saved.system_audio_device_selector, None);
+        assert_eq!(saved.audio_storage_format, AudioFormat::Wav);
         assert_eq!(saved.gemini_model, "primary");
         assert_eq!(saved.gemini_fallback_model, "fallback");
         assert_eq!(saved.chunk_minutes, 60);

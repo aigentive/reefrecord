@@ -116,7 +116,7 @@ export function GithubSyncPanel({ settings, onChanged }: Props) {
           onChange={(e) => setLfs(e.target.checked)}
           disabled={!enabled}
         />
-        <span>Use Git LFS for WAV files</span>
+        <span>Use Git LFS for audio files</span>
       </label>
 
       <div className="row">

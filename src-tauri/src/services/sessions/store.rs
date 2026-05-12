@@ -80,8 +80,8 @@ impl SessionStore {
             .find(|s| s.id == id)
             .cloned();
         if let Some(s) = summary {
-            if let Some(wav) = &s.wav_path {
-                let _ = std::fs::remove_file(wav);
+            if let Some(audio) = &s.audio_path {
+                let _ = std::fs::remove_file(audio);
             }
             if let Some(t) = &s.transcript_path {
                 let _ = std::fs::remove_file(t);
@@ -96,16 +96,16 @@ impl SessionStore {
         Ok(())
     }
 
-    pub fn clear_wav(&self, id: &str) -> AppResult<SessionSummary> {
+    pub fn clear_audio(&self, id: &str) -> AppResult<SessionSummary> {
         let mut summary = self
             .get(id)
             .ok_or_else(|| AppError::NotFound(format!("session {id} not found")))?;
-        if let Some(wav) = &summary.wav_path {
-            if Path::new(wav).exists() {
-                std::fs::remove_file(wav)?;
+        if let Some(audio) = &summary.audio_path {
+            if Path::new(audio).exists() {
+                std::fs::remove_file(audio)?;
             }
         }
-        summary.wav_path = None;
+        summary.audio_path = None;
         self.upsert(summary.clone())?;
         Ok(summary)
     }
@@ -125,18 +125,18 @@ impl SessionStore {
         Ok(count)
     }
 
-    pub fn clear_all_wavs(&self) -> AppResult<usize> {
+    pub fn clear_all_audio(&self) -> AppResult<usize> {
         let ids: Vec<String> = self
             .cache
             .read()
             .unwrap()
             .iter()
-            .filter(|s| s.wav_path.is_some())
+            .filter(|s| s.audio_path.is_some())
             .map(|s| s.id.clone())
             .collect();
         let count = ids.len();
         for id in ids {
-            self.clear_wav(&id)?;
+            self.clear_audio(&id)?;
         }
         Ok(count)
     }
@@ -180,8 +180,8 @@ impl SessionStore {
 
     fn write_metadata(&self, summary: &SessionSummary) -> AppResult<()> {
         let sessions_dir = self.sessions_dir()?;
-        let parent = match &summary.wav_path {
-            Some(wav) => Path::new(wav)
+        let parent = match &summary.audio_path {
+            Some(audio) => Path::new(audio)
                 .parent()
                 .map(|p| p.to_path_buf())
                 .unwrap_or(sessions_dir.clone()),
@@ -203,9 +203,9 @@ impl SessionStore {
 }
 
 fn normalize_disk_paths(summary: &mut SessionSummary) {
-    if let Some(wp) = &summary.wav_path {
-        if !Path::new(wp).exists() {
-            summary.wav_path = None;
+    if let Some(audio) = &summary.audio_path {
+        if !Path::new(audio).exists() {
+            summary.audio_path = None;
         }
     }
     if let Some(tp) = &summary.transcript_path {

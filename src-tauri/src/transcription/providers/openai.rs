@@ -5,9 +5,12 @@ use reqwest::multipart::{Form, Part};
 use reqwest::Client;
 use serde::Deserialize;
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::settings::Settings;
-use crate::transcription::chunking::{split_wav_with_policy, wav_duration_seconds, ChunkPolicy};
+use crate::transcription::chunking::{
+    audio_duration_seconds, split_audio_with_policy, ChunkPolicy,
+};
 use crate::transcription::prompt::{build_openai_prompt, format_timestamp};
 use crate::transcription::types::{
     TranscriptionOutcome, TranscriptionProvider, TranscriptionUsage,
@@ -49,12 +52,14 @@ pub async fn validate_key(key: &str, settings: &Settings) -> AppResult<String> {
 pub async fn transcribe(
     key: String,
     settings: &Settings,
-    wav_path: PathBuf,
+    audio_path: PathBuf,
+    audio_format: AudioFormat,
 ) -> AppResult<TranscriptionOutcome> {
     let client = http_client()?;
     let chunk_seconds = settings.chunk_minutes.max(1) as u64 * 60;
-    let chunks = split_wav_with_policy(
-        &wav_path,
+    let chunks = split_audio_with_policy(
+        &audio_path,
+        audio_format,
         ChunkPolicy {
             max_seconds: Some(chunk_seconds),
             max_bytes: Some(OPENAI_UPLOAD_LIMIT_BYTES),
@@ -62,7 +67,8 @@ pub async fn transcribe(
         },
     )?;
     tracing::info!(
-        wav = %wav_path.display(),
+        audio = %audio_path.display(),
+        format = audio_format.label(),
         chunks = chunks.len(),
         provider = "openai",
         "starting transcription"
@@ -71,21 +77,28 @@ pub async fn transcribe(
     let mut collected_text = Vec::<String>::new();
     let mut total_usage = TranscriptionUsage::Unknown;
     let mut model_used = settings.openai_model.clone();
-    for (idx, (chunk_path, offset_s)) in chunks.iter().enumerate() {
+    for (idx, chunk) in chunks.iter().enumerate() {
         tracing::info!(
             chunk = idx + 1,
             total = chunks.len(),
-            offset_s,
+            offset_s = chunk.offset_seconds,
             provider = "openai",
             "transcribing chunk"
         );
-        let response =
-            transcribe_chunk(&client, &key, settings, chunk_path.clone(), *offset_s).await?;
+        let response = transcribe_chunk(
+            &client,
+            &key,
+            settings,
+            chunk.path.clone(),
+            chunk.format,
+            chunk.offset_seconds,
+        )
+        .await?;
         model_used = settings.openai_model.clone();
         collected_text.push(response.text);
         total_usage = total_usage.merge(response.usage);
-        if chunk_path != &wav_path {
-            let _ = std::fs::remove_file(chunk_path);
+        if chunk.path != audio_path {
+            let _ = std::fs::remove_file(&chunk.path);
         }
     }
 
@@ -105,6 +118,7 @@ async fn transcribe_chunk(
     key: &str,
     settings: &Settings,
     chunk_path: PathBuf,
+    audio_format: AudioFormat,
     offset_seconds: u64,
 ) -> AppResult<ChunkOutcome> {
     let bytes = tokio::fs::read(&chunk_path).await?;
@@ -115,7 +129,7 @@ async fn transcribe_chunk(
         .to_string();
     let file_part = Part::bytes(bytes)
         .file_name(file_name)
-        .mime_str("audio/wav")
+        .mime_str(audio_format.mime_type())
         .map_err(|e| AppError::Http(format!("OpenAI multipart MIME error: {e}")))?;
     let mut form = Form::new()
         .part("file", file_part)
@@ -158,7 +172,7 @@ async fn transcribe_chunk(
             truncate(&text, 200)
         ))
     })?;
-    let duration = wav_duration_seconds(&chunk_path).unwrap_or(0.0);
+    let duration = audio_duration_seconds(&chunk_path, audio_format).unwrap_or(0.0);
     let rendered = render_response(parsed, offset_seconds as f64);
     Ok(ChunkOutcome {
         text: rendered.text,

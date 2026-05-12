@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::audio::format::AudioFormat;
 use crate::transcription::types::{TranscriptionProvider, TranscriptionUsage};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +34,9 @@ pub struct SessionSummary {
     pub started_at: DateTime<Utc>,
     pub duration_seconds: u64,
     #[serde(default)]
-    pub wav_path: Option<String>,
+    pub audio_path: Option<String>,
+    #[serde(default)]
+    pub audio_format: AudioFormat,
     #[serde(default)]
     pub transcript_path: Option<String>,
     pub mic_device_name: Option<String>,
@@ -65,8 +68,8 @@ pub struct SessionSummary {
 
 impl SessionSummary {
     pub fn metadata_path(&self, sessions_dir: &Path) -> PathBuf {
-        if let Some(wav) = &self.wav_path {
-            let p = PathBuf::from(wav);
+        if let Some(audio) = &self.audio_path {
+            let p = PathBuf::from(audio);
             return p.with_file_name(format!("{}.json", self.id));
         }
         sessions_dir.join(format!("{}.json", self.id))

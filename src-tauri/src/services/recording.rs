@@ -6,11 +6,10 @@ use chrono::{Local, Utc};
 use serde::Deserialize;
 
 use crate::audio::capture::{start_capture, InputCapture};
+use crate::audio::format::AudioFormat;
 use crate::audio::writer::{mix_mono_i16, write_wav_mono_i16};
 use crate::error::{AppError, AppResult};
-use crate::services::sessions::{
-    SessionStore, SessionSummary, SyncStatus, TranscriptionStatus,
-};
+use crate::services::sessions::{SessionStore, SessionSummary, SyncStatus, TranscriptionStatus};
 use crate::settings::SettingsStore;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,16 +59,15 @@ impl RecordingService {
         let started_at_utc = Utc::now();
         // Session id uses local wall-clock time to match user expectation and
         // the python reference's filename format.
-        let session_id = format!(
-            "session_{}",
-            Local::now().format("%Y%m%d_%H%M%S")
-        );
+        let session_id = format!("session_{}", Local::now().format("%Y%m%d_%H%M%S"));
 
-        let mic = start_capture(input.mic_device_selector.clone(), false, "mic")
-            .map_err(|e| match e {
-                AppError::Audio(msg) => AppError::Audio(format!("microphone: {msg}")),
-                other => other,
-            })?;
+        let mic =
+            start_capture(input.mic_device_selector.clone(), false, "mic").map_err(
+                |e| match e {
+                    AppError::Audio(msg) => AppError::Audio(format!("microphone: {msg}")),
+                    other => other,
+                },
+            )?;
 
         let system = if input.capture_system_audio {
             match start_capture(input.system_audio_device_selector.clone(), true, "system") {
@@ -144,7 +142,8 @@ impl RecordingService {
             id: session_id,
             started_at: started_at_utc,
             duration_seconds,
-            wav_path: Some(wav_path.to_string_lossy().to_string()),
+            audio_path: Some(wav_path.to_string_lossy().to_string()),
+            audio_format: AudioFormat::Wav,
             transcript_path: None,
             mic_device_name: Some(mic_name),
             system_device_name: system_name,

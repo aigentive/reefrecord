@@ -116,15 +116,15 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
         <button
           type="button"
           className="btn"
-          disabled={!session.wavPath}
-          title={session.wavPath ? undefined : "WAV has been cleared"}
+          disabled={!session.audioPath}
+          title={session.audioPath ? undefined : "Audio has been cleared"}
           onClick={() =>
-            session.wavPath &&
-            revealPath(session.wavPath).catch((e) => setMsg(String(e)))
+            session.audioPath &&
+            revealPath(session.audioPath).catch((e) => setMsg(String(e)))
           }
         >
           <ExternalLink size={14} />
-          Reveal WAV
+          Reveal {session.audioFormat.toUpperCase()}
         </button>
         {session.transcriptPath && (
           <button
@@ -201,7 +201,7 @@ export function TranscriptDrawer({ session, onSessionUpdated }: Props) {
       ) : session.transcriptionStatus === "transcribing" ? (
         <div className="empty">Transcribing…</div>
       ) : session.transcriptionStatus === "failed" ? (
-        <div className="empty">Transcription failed. WAV is still saved.</div>
+        <div className="empty">Transcription failed. Audio is still saved.</div>
       ) : (
         <div className="empty">No transcript yet.</div>
       )}

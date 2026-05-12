@@ -4,9 +4,10 @@ use std::time::Duration;
 use reqwest::Client;
 use serde::Deserialize;
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::settings::Settings;
-use crate::transcription::chunking::{split_wav_with_policy, ChunkPolicy};
+use crate::transcription::chunking::{split_audio_with_policy, ChunkPolicy};
 use crate::transcription::prompt::format_timestamp;
 use crate::transcription::types::{
     TranscriptionOutcome, TranscriptionProvider, TranscriptionUsage,
@@ -33,12 +34,14 @@ pub async fn validate_key(key: &str, _settings: &Settings) -> AppResult<String> 
 pub async fn transcribe(
     key: String,
     settings: &Settings,
-    wav_path: PathBuf,
+    audio_path: PathBuf,
+    audio_format: AudioFormat,
 ) -> AppResult<TranscriptionOutcome> {
     let client = http_client()?;
     let chunk_minutes = settings.chunk_minutes.clamp(1, 9) as u64;
-    let chunks = split_wav_with_policy(
-        &wav_path,
+    let chunks = split_audio_with_policy(
+        &audio_path,
+        audio_format,
         ChunkPolicy {
             max_seconds: Some(chunk_minutes * 60),
             max_bytes: None,
@@ -46,7 +49,8 @@ pub async fn transcribe(
         },
     )?;
     tracing::info!(
-        wav = %wav_path.display(),
+        audio = %audio_path.display(),
+        format = audio_format.label(),
         chunks = chunks.len(),
         provider = "deepgram",
         "starting transcription"
@@ -54,20 +58,27 @@ pub async fn transcribe(
 
     let mut collected_text = Vec::<String>::new();
     let mut total_usage = TranscriptionUsage::Unknown;
-    for (idx, (chunk_path, offset_s)) in chunks.iter().enumerate() {
+    for (idx, chunk) in chunks.iter().enumerate() {
         tracing::info!(
             chunk = idx + 1,
             total = chunks.len(),
-            offset_s,
+            offset_s = chunk.offset_seconds,
             provider = "deepgram",
             "transcribing chunk"
         );
-        let response =
-            transcribe_chunk(&client, &key, settings, chunk_path.clone(), *offset_s).await?;
+        let response = transcribe_chunk(
+            &client,
+            &key,
+            settings,
+            chunk.path.clone(),
+            chunk.format,
+            chunk.offset_seconds,
+        )
+        .await?;
         collected_text.push(response.text);
         total_usage = total_usage.merge(response.usage);
-        if chunk_path != &wav_path {
-            let _ = std::fs::remove_file(chunk_path);
+        if chunk.path != audio_path {
+            let _ = std::fs::remove_file(&chunk.path);
         }
     }
 
@@ -87,13 +98,14 @@ async fn transcribe_chunk(
     key: &str,
     settings: &Settings,
     chunk_path: PathBuf,
+    audio_format: AudioFormat,
     offset_seconds: u64,
 ) -> AppResult<ChunkOutcome> {
     let bytes = tokio::fs::read(&chunk_path).await?;
     let mut req = client
         .post("https://api.deepgram.com/v1/listen")
         .header("Authorization", format!("Token {key}"))
-        .header("Content-Type", "audio/wav")
+        .header("Content-Type", audio_format.mime_type())
         .query(&[
             ("model", settings.deepgram_model.as_str()),
             (

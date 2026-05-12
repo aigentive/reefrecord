@@ -84,11 +84,11 @@ pub async fn delete_session(state: State<'_, AppState>, session_id: String) -> A
 }
 
 #[tauri::command]
-pub async fn clear_session_wav(
+pub async fn clear_session_audio(
     state: State<'_, AppState>,
     session_id: String,
 ) -> AppResult<SessionSummary> {
-    state.sessions.clear_wav(&session_id)
+    state.sessions.clear_audio(&session_id)
 }
 
 #[tauri::command]
@@ -97,6 +97,6 @@ pub async fn delete_all_sessions(state: State<'_, AppState>) -> AppResult<usize>
 }
 
 #[tauri::command]
-pub async fn clear_all_wavs(state: State<'_, AppState>) -> AppResult<usize> {
-    state.sessions.clear_all_wavs()
+pub async fn clear_all_audio(state: State<'_, AppState>) -> AppResult<usize> {
+    state.sessions.clear_all_audio()
 }

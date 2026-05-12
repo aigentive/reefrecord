@@ -7,6 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 
 pub struct GeminiClient {
@@ -155,12 +156,19 @@ impl GeminiClient {
         Ok("Key valid.".to_string())
     }
 
-    pub async fn upload_audio_file(&self, path: &Path) -> AppResult<String> {
+    pub async fn upload_audio_file(
+        &self,
+        path: &Path,
+        audio_format: AudioFormat,
+    ) -> AppResult<String> {
         let file_size = std::fs::metadata(path)?.len();
         let display_name = path
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("audio.wav")
+            .unwrap_or_else(|| match audio_format {
+                AudioFormat::Wav => "audio.wav",
+                AudioFormat::Flac => "audio.flac",
+            })
             .to_string();
 
         let start_url = "https://generativelanguage.googleapis.com/upload/v1beta/files";
@@ -171,7 +179,10 @@ impl GeminiClient {
             .header("X-Goog-Upload-Protocol", "resumable")
             .header("X-Goog-Upload-Command", "start")
             .header("X-Goog-Upload-Header-Content-Length", file_size.to_string())
-            .header("X-Goog-Upload-Header-Content-Type", "audio/wav")
+            .header(
+                "X-Goog-Upload-Header-Content-Type",
+                audio_format.mime_type(),
+            )
             .header("Content-Type", "application/json")
             .json(&json!({ "file": { "display_name": display_name } }))
             .send()
@@ -335,21 +346,21 @@ impl GeminiClient {
     }
 }
 
-pub fn build_inline_audio_part(path: &Path) -> AppResult<AudioPart> {
+pub fn build_inline_audio_part(path: &Path, audio_format: AudioFormat) -> AppResult<AudioPart> {
     let bytes = std::fs::read(path)?;
     let encoded = B64_STANDARD.encode(bytes);
     Ok(AudioPart::Inline {
         inline_data: InlineData {
-            mime_type: "audio/wav".into(),
+            mime_type: audio_format.mime_type().into(),
             data: encoded,
         },
     })
 }
 
-pub fn build_file_audio_part(file_uri: String) -> AudioPart {
+pub fn build_file_audio_part(file_uri: String, audio_format: AudioFormat) -> AudioPart {
     AudioPart::File {
         file_data: FileData {
-            mime_type: "audio/wav".into(),
+            mime_type: audio_format.mime_type().into(),
             file_uri,
         },
     }
@@ -400,7 +411,7 @@ mod tests {
         let wav = dir.path().join("sample.wav");
         std::fs::write(&wav, [0u8, 1, 2, 3]).unwrap();
 
-        let inline = build_inline_audio_part(&wav).unwrap();
+        let inline = build_inline_audio_part(&wav, AudioFormat::Wav).unwrap();
         let inline_json = serde_json::to_value(inline).unwrap();
         assert_eq!(
             inline_json["inline_data"]["mime_type"].as_str(),
@@ -411,7 +422,7 @@ mod tests {
             Some("AAECAw==")
         );
 
-        let file = build_file_audio_part("files/abc".into());
+        let file = build_file_audio_part("files/abc".into(), AudioFormat::Wav);
         let file_json = serde_json::to_value(file).unwrap();
         assert_eq!(
             file_json["file_data"]["mime_type"].as_str(),

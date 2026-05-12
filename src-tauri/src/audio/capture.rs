@@ -62,13 +62,16 @@ pub fn resolve_input_device(selector: Option<&str>, require_blackhole: bool) -> 
                 return Err(AppError::Audio(format!("no input device at index {idx}")));
             }
             let lower = sel_trim.to_lowercase();
-            if let Some(dev) = devices
-                .into_iter()
-                .find(|d| d.name().map(|n| n.to_lowercase().contains(&lower)).unwrap_or(false))
-            {
+            if let Some(dev) = devices.into_iter().find(|d| {
+                d.name()
+                    .map(|n| n.to_lowercase().contains(&lower))
+                    .unwrap_or(false)
+            }) {
                 return Ok(dev);
             }
-            return Err(AppError::Audio(format!("no input device matches {sel_trim:?}")));
+            return Err(AppError::Audio(format!(
+                "no input device matches {sel_trim:?}"
+            )));
         }
     }
     if require_blackhole {

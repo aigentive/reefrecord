@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use crate::audio::format::AudioFormat;
+use crate::audio::writer::{transcode_flac_to_wav, transcode_wav_to_flac};
 use crate::error::{AppError, AppResult};
 use crate::services::secrets;
 use crate::services::sessions::{SessionStore, SessionSummary, TranscriptionStatus};
@@ -34,7 +36,7 @@ pub async fn transcribe_session(
         Err(e) => return fail_transcription_preflight(sessions, summary, provider, e),
     };
 
-    let wav_path = match summary.wav_path.clone() {
+    let audio_path = match summary.audio_path.clone() {
         Some(p) if Path::new(&p).exists() => PathBuf::from(p),
         _ => {
             return fail_transcription_preflight(
@@ -42,19 +44,29 @@ pub async fn transcribe_session(
                 summary,
                 provider,
                 AppError::Invalid(
-                    "WAV file is no longer on disk. Clear the session and re-record.".into(),
+                    "Audio file is no longer on disk. Clear the session and re-record.".into(),
                 ),
             );
         }
     };
+    let audio_format = AudioFormat::from_path(&audio_path).unwrap_or(summary.audio_format);
 
     begin_transcription(sessions, &mut summary, provider)?;
-    let transcript_path = transcript_path_for(&summary, &wav_path, provider);
+    let transcript_path = transcript_path_for(&summary, &audio_path, provider);
 
-    match transcription::transcribe(provider, key, &settings_snapshot, wav_path).await {
+    match transcription::transcribe(provider, key, &settings_snapshot, audio_path, audio_format)
+        .await
+    {
         Ok(outcome) => {
             let cost_usd = transcription::estimate_cost(&settings_snapshot, &outcome);
-            complete_transcription(sessions, &mut summary, &transcript_path, outcome, cost_usd)?;
+            complete_transcription(
+                sessions,
+                &mut summary,
+                &transcript_path,
+                settings_snapshot.audio_storage_format,
+                outcome,
+                cost_usd,
+            )?;
             Ok(summary)
         }
         Err(e) => fail_transcription(sessions, summary, e),
@@ -82,11 +94,13 @@ fn complete_transcription(
     sessions: &SessionStore,
     summary: &mut SessionSummary,
     transcript_path: &Path,
+    desired_audio_format: AudioFormat,
     outcome: TranscriptionOutcome,
     cost_usd: f64,
 ) -> AppResult<()> {
     remove_replaced_transcript(summary, transcript_path);
     std::fs::write(transcript_path, &outcome.text)?;
+    ensure_audio_storage(summary, desired_audio_format)?;
 
     summary.transcript_path = Some(transcript_path.to_string_lossy().to_string());
     summary.transcription_status = TranscriptionStatus::Complete;
@@ -155,17 +169,45 @@ fn set_legacy_usage_fields(summary: &mut SessionSummary, usage: &TranscriptionUs
 
 fn transcript_path_for(
     summary: &SessionSummary,
-    wav_path: &Path,
+    audio_path: &Path,
     provider: TranscriptionProvider,
 ) -> PathBuf {
-    wav_path.with_file_name(format!(
+    audio_path.with_file_name(format!(
         "{}_{}.txt",
-        wav_path
+        audio_path
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or(&summary.id),
         provider
     ))
+}
+
+fn ensure_audio_storage(
+    summary: &mut SessionSummary,
+    desired_audio_format: AudioFormat,
+) -> AppResult<()> {
+    let Some(audio_path) = summary.audio_path.clone() else {
+        return Ok(());
+    };
+    let path = PathBuf::from(audio_path);
+    if !path.exists() {
+        return Err(AppError::Invalid(
+            "Audio file is no longer on disk. Clear the session and re-record.".into(),
+        ));
+    }
+    let current_format = AudioFormat::from_path(&path).unwrap_or(summary.audio_format);
+    if current_format == desired_audio_format {
+        summary.audio_format = current_format;
+        return Ok(());
+    }
+    let next_path = match (current_format, desired_audio_format) {
+        (AudioFormat::Wav, AudioFormat::Flac) => transcode_wav_to_flac(&path)?,
+        (AudioFormat::Flac, AudioFormat::Wav) => transcode_flac_to_wav(&path)?,
+        _ => path,
+    };
+    summary.audio_path = Some(next_path.to_string_lossy().to_string());
+    summary.audio_format = desired_audio_format;
+    Ok(())
 }
 
 fn remove_replaced_transcript(summary: &SessionSummary, next_path: &Path) {
@@ -190,6 +232,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::audio::writer::{read_flac_i32, write_wav_mono_i16};
     use crate::services::sessions::{SyncStatus, TranscriptionStatus};
 
     fn store_with_dir() -> (tempfile::TempDir, SessionStore, PathBuf) {
@@ -208,12 +251,13 @@ mod tests {
             id: id.to_string(),
             started_at: "2026-05-11T10:00:00Z".parse().unwrap(),
             duration_seconds: 42,
-            wav_path: Some(
+            audio_path: Some(
                 sessions_dir
                     .join(format!("{id}.wav"))
                     .to_string_lossy()
                     .to_string(),
             ),
+            audio_format: AudioFormat::Wav,
             transcript_path: None,
             mic_device_name: Some("Studio Mic".into()),
             system_device_name: None,
@@ -299,6 +343,27 @@ mod tests {
         assert_eq!(
             transcript_path_for(&session, &wav, TranscriptionProvider::Openai),
             sessions_dir.join("session_20260511_100000_openai.txt")
+        );
+    }
+
+    #[test]
+    fn ensure_audio_storage_converts_wav_to_flac_for_archival() {
+        let (_config, _store, sessions_dir) = store_with_dir();
+        std::fs::create_dir_all(&sessions_dir).unwrap();
+        let mut session = summary("session_20260511_100000", &sessions_dir);
+        let wav = PathBuf::from(session.audio_path.as_deref().unwrap());
+        let samples = (0..32).map(|n| n as i16 - 16).collect::<Vec<i16>>();
+        write_wav_mono_i16(&wav, &samples).unwrap();
+
+        ensure_audio_storage(&mut session, AudioFormat::Flac).unwrap();
+
+        let audio = PathBuf::from(session.audio_path.as_deref().unwrap());
+        assert_eq!(session.audio_format, AudioFormat::Flac);
+        assert_eq!(audio.extension().and_then(|s| s.to_str()), Some("flac"));
+        assert!(!wav.exists());
+        assert_eq!(
+            read_flac_i32(&audio).unwrap().0,
+            (0..32).map(|n| n - 16).collect::<Vec<i32>>()
         );
     }
 

@@ -27,6 +27,8 @@ dirs = "5"
 chrono = { version = "0.4", features = ["serde"] }
 cpal = "0.15"
 hound = "3"
+flacenc = { version = "0.5.1", default-features = false }
+claxon = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
 base64 = "0.22"
 which = "7"

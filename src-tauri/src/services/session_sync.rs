@@ -85,6 +85,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::audio::format::AudioFormat;
     use crate::services::sessions::{SessionSummary, TranscriptionStatus};
     use crate::transcription::types::TranscriptionProvider;
 
@@ -109,12 +110,13 @@ mod tests {
             id: id.to_string(),
             started_at: "2026-05-11T10:00:00Z".parse().unwrap(),
             duration_seconds: 42,
-            wav_path: Some(
+            audio_path: Some(
                 sessions_dir
                     .join(format!("{id}.wav"))
                     .to_string_lossy()
                     .to_string(),
             ),
+            audio_format: AudioFormat::Wav,
             transcript_path: None,
             mic_device_name: Some("Studio Mic".into()),
             system_device_name: None,

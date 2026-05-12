@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::gemini::client::{
     build_file_audio_part, build_inline_audio_part, GeminiClient, GeminiUsage,
 };
 use crate::gemini::GEMINI_AUDIO_INLINE_LIMIT;
 use crate::settings::Settings;
-use crate::transcription::chunking::{split_wav_with_policy, ChunkPolicy};
+use crate::transcription::chunking::{split_audio_with_policy, ChunkPolicy};
 use crate::transcription::prompt::build_gemini_prompt;
 use crate::transcription::types::{
     TranscriptionOutcome, TranscriptionProvider, TranscriptionUsage,
@@ -20,12 +21,14 @@ pub async fn validate_key(key: &str, settings: &Settings) -> AppResult<String> {
 pub async fn transcribe(
     key: String,
     settings: &Settings,
-    wav_path: PathBuf,
+    audio_path: PathBuf,
+    audio_format: AudioFormat,
 ) -> AppResult<TranscriptionOutcome> {
     let client = GeminiClient::new(key)?;
     let chunk_seconds = settings.chunk_minutes.max(1) as u64 * 60;
-    let chunks = split_wav_with_policy(
-        &wav_path,
+    let chunks = split_audio_with_policy(
+        &audio_path,
+        audio_format,
         ChunkPolicy {
             max_seconds: Some(chunk_seconds),
             max_bytes: None,
@@ -33,7 +36,8 @@ pub async fn transcribe(
         },
     )?;
     tracing::info!(
-        wav = %wav_path.display(),
+        audio = %audio_path.display(),
+        format = audio_format.label(),
         chunks = chunks.len(),
         provider = "gemini",
         "starting transcription"
@@ -42,23 +46,24 @@ pub async fn transcribe(
     let mut collected_text = Vec::<String>::new();
     let mut total_usage = GeminiUsage::default();
     let mut last_model = settings.gemini_model.clone();
-    for (idx, (chunk_path, offset_s)) in chunks.iter().enumerate() {
+    for (idx, chunk) in chunks.iter().enumerate() {
         tracing::info!(
             chunk = idx + 1,
             total = chunks.len(),
-            offset_s,
+            offset_s = chunk.offset_seconds,
             provider = "gemini",
             "transcribing chunk"
         );
         let prompt = build_gemini_prompt(
-            *offset_s,
+            chunk.offset_seconds,
             &settings.language_hint,
             settings.include_speaker_labels,
             settings.include_timestamps,
         );
         let (text, usage, model_used) = transcribe_chunk(
             &client,
-            chunk_path,
+            &chunk.path,
+            chunk.format,
             &prompt,
             &settings.gemini_model,
             &settings.gemini_fallback_model,
@@ -67,8 +72,8 @@ pub async fn transcribe(
         collected_text.push(text);
         total_usage = total_usage.merge(usage);
         last_model = model_used;
-        if chunk_path != &wav_path {
-            let _ = std::fs::remove_file(chunk_path);
+        if chunk.path != audio_path {
+            let _ = std::fs::remove_file(&chunk.path);
         }
     }
 
@@ -92,16 +97,17 @@ pub async fn transcribe(
 async fn transcribe_chunk(
     client: &GeminiClient,
     chunk_path: &Path,
+    audio_format: AudioFormat,
     prompt: &str,
     primary: &str,
     fallback: &str,
 ) -> AppResult<(String, GeminiUsage, String)> {
     let file_size = std::fs::metadata(chunk_path)?.len();
     let audio_part = if file_size > GEMINI_AUDIO_INLINE_LIMIT {
-        let uri = client.upload_audio_file(chunk_path).await?;
-        build_file_audio_part(uri)
+        let uri = client.upload_audio_file(chunk_path, audio_format).await?;
+        build_file_audio_part(uri, audio_format)
     } else {
-        build_inline_audio_part(chunk_path)?
+        build_inline_audio_part(chunk_path, audio_format)?
     };
 
     match client

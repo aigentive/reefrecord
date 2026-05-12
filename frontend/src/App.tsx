@@ -9,7 +9,7 @@ import { SettingsSheet } from "./features/settings/SettingsSheet";
 import { Archive, Trash2, X } from "lucide-react";
 import type { AppStatus, SessionSummary, Settings } from "./api/types";
 import {
-  clearAllWavs,
+  clearAllAudio,
   deleteAllSessions,
   getAppStatus,
   getSettings,
@@ -147,7 +147,7 @@ export function App() {
   async function doDeleteAllSessions() {
     if (sessions.length === 0) return;
     const ok = window.confirm(
-      `Delete all ${sessions.length} sessions?\n\nRemoves every WAV, transcript, and metadata file. This cannot be undone.`
+      `Delete all ${sessions.length} sessions?\n\nRemoves every audio file, transcript, and metadata file. This cannot be undone.`
     );
     if (!ok) return;
     try {
@@ -159,15 +159,15 @@ export function App() {
     }
   }
 
-  async function doClearAllWavs() {
-    const withWav = sessions.filter((s) => s.wavPath).length;
-    if (withWav === 0) return;
+  async function doClearAllAudio() {
+    const withAudio = sessions.filter((s) => s.audioPath).length;
+    if (withAudio === 0) return;
     const ok = window.confirm(
-      `Clear WAV from ${withWav} session${withWav === 1 ? "" : "s"}?\n\nKeeps transcripts and metadata. Retranscription won't be possible after this.`
+      `Clear audio from ${withAudio} session${withAudio === 1 ? "" : "s"}?\n\nKeeps transcripts and metadata. Retranscription won't be possible after this.`
     );
     if (!ok) return;
     try {
-      await clearAllWavs();
+      await clearAllAudio();
       await refreshSessions();
     } catch (e) {
       setError(String(e));
@@ -290,10 +290,10 @@ export function App() {
                 <button
                   type="button"
                   className="btn btn-icon"
-                  aria-label="Clear all WAVs"
-                  title="Clear WAV for every session (keeps transcripts)"
-                  disabled={sessions.every((s) => !s.wavPath)}
-                  onClick={doClearAllWavs}
+                  aria-label="Clear all audio"
+                  title="Clear audio for every session (keeps transcripts)"
+                  disabled={sessions.every((s) => !s.audioPath)}
+                  onClick={doClearAllAudio}
                 >
                   <Archive size={13} />
                 </button>
@@ -301,7 +301,7 @@ export function App() {
                   type="button"
                   className="btn btn-icon btn-danger"
                   aria-label="Delete all sessions"
-                  title="Delete all sessions (WAV + transcript + metadata)"
+                  title="Delete all sessions (audio + transcript + metadata)"
                   disabled={sessions.length === 0}
                   onClick={doDeleteAllSessions}
                 >

@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use hound::WavReader;
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::gemini::client::{
     build_file_audio_part, build_inline_audio_part, GeminiClient, GeminiUsage,
@@ -87,10 +88,12 @@ async fn transcribe_chunk(
 ) -> AppResult<(String, GeminiUsage, String)> {
     let file_size = std::fs::metadata(chunk_path)?.len();
     let audio_part = if file_size > GEMINI_AUDIO_INLINE_LIMIT {
-        let uri = client.upload_audio_file(chunk_path).await?;
-        build_file_audio_part(uri)
+        let uri = client
+            .upload_audio_file(chunk_path, AudioFormat::Wav)
+            .await?;
+        build_file_audio_part(uri, AudioFormat::Wav)
     } else {
-        build_inline_audio_part(chunk_path)?
+        build_inline_audio_part(chunk_path, AudioFormat::Wav)?
     };
 
     match client
@@ -183,12 +186,9 @@ pub fn build_prompt(
 
 /// Returns list of (chunk_path, offset_seconds). If splitting is not required,
 /// returns a single-entry vec with the original path and offset 0.
-pub fn split_wav_if_needed(
-    wav_path: &Path,
-    chunk_minutes: u32,
-) -> AppResult<Vec<(PathBuf, u64)>> {
-    let reader = WavReader::open(wav_path)
-        .map_err(|e| AppError::Audio(format!("cannot read wav: {e}")))?;
+pub fn split_wav_if_needed(wav_path: &Path, chunk_minutes: u32) -> AppResult<Vec<(PathBuf, u64)>> {
+    let reader =
+        WavReader::open(wav_path).map_err(|e| AppError::Audio(format!("cannot read wav: {e}")))?;
     let spec = reader.spec();
     let total_samples = reader.len() as u64;
     let duration_seconds = total_samples / spec.channels as u64 / spec.sample_rate as u64;

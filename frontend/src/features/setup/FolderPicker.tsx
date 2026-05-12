@@ -42,7 +42,7 @@ export function FolderPicker({ settings, onChanged }: Props) {
   return (
     <div className="inline-setup-body">
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-        Where WAV and transcript files are saved.
+        Where audio and transcript files are saved.
       </p>
       <div className="field">
         <label className="field-label">Current folder</label>

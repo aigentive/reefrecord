@@ -69,7 +69,9 @@ pub fn reveal_path(path: &str) -> AppResult<()> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
-        Err(AppError::msg("Reveal is only implemented for macOS in this MVP."))
+        Err(AppError::msg(
+            "Reveal is only implemented for macOS in this MVP.",
+        ))
     }
 }
 
@@ -91,6 +93,8 @@ pub fn open_folder(path: &str) -> AppResult<()> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
-        Err(AppError::msg("Open folder is only implemented for macOS in this MVP."))
+        Err(AppError::msg(
+            "Open folder is only implemented for macOS in this MVP.",
+        ))
     }
 }

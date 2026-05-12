@@ -13,6 +13,7 @@ export type ProviderStatus = {
 };
 
 export type TranscriptionProvider = "gemini" | "openai" | "deepgram";
+export type AudioFormat = "wav" | "flac";
 
 export type AppStatus = {
   mic: ProviderStatus;
@@ -33,6 +34,7 @@ export type Settings = {
   micDeviceSelector: string | null;
   systemAudioDeviceSelector: string | null;
   transcriptionProvider: TranscriptionProvider;
+  audioStorageFormat: AudioFormat;
   geminiModel: string;
   geminiFallbackModel: string;
   openaiModel: string;
@@ -114,7 +116,8 @@ export type SessionSummary = {
   id: string;
   startedAt: string;
   durationSeconds: number;
-  wavPath: string | null;
+  audioPath: string | null;
+  audioFormat: AudioFormat;
   transcriptPath: string | null;
   transcriptPreview?: string;
   micDeviceName: string | null;

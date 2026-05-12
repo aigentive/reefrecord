@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Archive, RefreshCw, Trash2, Upload } from "lucide-react";
 import type { SessionSummary } from "../../api/types";
 import {
-  clearSessionWav,
+  clearSessionAudio,
   deleteSession,
   syncSession,
   transcribeSession,
@@ -64,16 +64,16 @@ function SessionRow({
 }: RowProps) {
   const [retrying, setRetrying] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [busyAction, setBusyAction] = useState<null | "delete" | "clear-wav">(
+  const [busyAction, setBusyAction] = useState<null | "delete" | "clear-audio">(
     null
   );
 
   const transStatus = session.transcriptionStatus;
   const syncStatus = session.syncStatus;
   const transcriptBusy = transStatus === "transcribing" || retrying;
-  const hasWav = !!session.wavPath;
+  const hasAudio = !!session.audioPath;
   const canRetranscribe =
-    hasWav &&
+    hasAudio &&
     (transStatus === "pending" ||
       transStatus === "failed" ||
       transStatus === "complete" ||
@@ -133,7 +133,7 @@ function SessionRow({
   async function doDelete(e: React.MouseEvent) {
     e.stopPropagation();
     const ok = window.confirm(
-      `Delete ${session.id}?\n\nRemoves the WAV, transcript, and metadata. This cannot be undone.`
+      `Delete ${session.id}?\n\nRemoves the audio file, transcript, and metadata. This cannot be undone.`
     );
     if (!ok) return;
     setBusyAction("delete");
@@ -147,19 +147,19 @@ function SessionRow({
     }
   }
 
-  async function doClearWav(e: React.MouseEvent) {
+  async function doClearAudio(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!hasWav) return;
+    if (!hasAudio) return;
     const ok = window.confirm(
-      `Clear the WAV from ${session.id}?\n\nKeeps the transcript. You won't be able to retranscribe afterwards.`
+      `Clear the audio file from ${session.id}?\n\nKeeps the transcript. You won't be able to retranscribe afterwards.`
     );
     if (!ok) return;
-    setBusyAction("clear-wav");
+    setBusyAction("clear-audio");
     try {
-      const next = await clearSessionWav(session.id);
+      const next = await clearSessionAudio(session.id);
       onSessionUpdated(next);
     } catch (err) {
-      window.alert(`Clear WAV failed: ${String(err)}`);
+      window.alert(`Clear audio failed: ${String(err)}`);
     } finally {
       setBusyAction(null);
     }
@@ -189,6 +189,12 @@ function SessionRow({
       <div className="session-row-meta">
         <span className="session-row-quant">
           {formatSeconds(session.durationSeconds)}
+          {session.audioPath && (
+            <>
+              <span className="session-row-dot" aria-hidden>·</span>
+              <span>{session.audioFormat.toUpperCase()}</span>
+            </>
+          )}
           {providerModel(session) && (
             <>
               <span className="session-row-dot" aria-hidden>·</span>
@@ -271,14 +277,14 @@ function SessionRow({
         <button
           type="button"
           className="btn btn-icon"
-          aria-label="Clear WAV"
+          aria-label="Clear audio"
           title={
-            hasWav
-              ? "Clear WAV (keeps transcript)"
-              : "WAV already cleared"
+            hasAudio
+              ? "Clear audio (keeps transcript)"
+              : "Audio already cleared"
           }
-          disabled={!hasWav || busyAction === "clear-wav"}
-          onClick={doClearWav}
+          disabled={!hasAudio || busyAction === "clear-audio"}
+          onClick={doClearAudio}
         >
           <Archive size={13} />
         </button>
@@ -286,7 +292,7 @@ function SessionRow({
           type="button"
           className="btn btn-icon btn-danger"
           aria-label="Delete session"
-          title="Delete session (WAV + transcript + metadata)"
+          title="Delete session (audio + transcript + metadata)"
           disabled={busyAction === "delete"}
           onClick={doDelete}
         >

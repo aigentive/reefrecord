@@ -119,6 +119,29 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                 placeholder="blackhole"
               />
             </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="s-audio-storage">
+                Audio archive format
+              </label>
+              <select
+                id="s-audio-storage"
+                className="input"
+                value={draft.audioStorageFormat}
+                onChange={(e) =>
+                  set(
+                    "audioStorageFormat",
+                    e.target.value as Settings["audioStorageFormat"]
+                  )
+                }
+              >
+                <option value="flac">FLAC archive (recommended)</option>
+                <option value="wav">WAV archive (current behavior)</option>
+              </select>
+              <div className="field-hint">
+                Applied after successful transcription; recording still captures WAV first.
+              </div>
+            </div>
           </section>
 
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -369,7 +392,7 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
                 onChange={(e) => set("gitLfsEnabled", e.target.checked)}
                 disabled={!draft.githubSyncEnabled}
               />
-              <span>Use Git LFS for WAV files</span>
+              <span>Use Git LFS for audio files</span>
             </label>
           </section>
         </div>

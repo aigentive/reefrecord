@@ -83,9 +83,9 @@ pub fn run() {
             commands::session_commands::sync_session,
             commands::session_commands::validate_git_sync_settings,
             commands::session_commands::delete_session,
-            commands::session_commands::clear_session_wav,
+            commands::session_commands::clear_session_audio,
             commands::session_commands::delete_all_sessions,
-            commands::session_commands::clear_all_wavs,
+            commands::session_commands::clear_all_audio,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

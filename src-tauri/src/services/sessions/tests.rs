@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::audio::format::AudioFormat;
 use crate::settings::SettingsStore;
 use crate::transcription::types::TranscriptionProvider;
 
@@ -22,12 +23,13 @@ fn summary(id: &str, started_at: &str, sessions_dir: &Path) -> SessionSummary {
         id: id.to_string(),
         started_at: started_at.parse().unwrap(),
         duration_seconds: 42,
-        wav_path: Some(
+        audio_path: Some(
             sessions_dir
                 .join(format!("{id}.wav"))
                 .to_string_lossy()
                 .to_string(),
         ),
+        audio_format: AudioFormat::Wav,
         transcript_path: Some(
             sessions_dir
                 .join(format!("{id}_gemini.txt"))
@@ -54,21 +56,22 @@ fn summary(id: &str, started_at: &str, sessions_dir: &Path) -> SessionSummary {
 #[test]
 fn metadata_path_uses_wav_parent_or_sessions_dir() {
     let sessions_dir = PathBuf::from("/tmp/sessions");
-    let with_wav = SessionSummary {
-        wav_path: Some("/tmp/audio/session_1.wav".into()),
+    let with_audio = SessionSummary {
+        audio_path: Some("/tmp/audio/session_1.flac".into()),
+        audio_format: AudioFormat::Flac,
         ..summary("session_1", "2026-05-11T10:00:00Z", &sessions_dir)
     };
-    let without_wav = SessionSummary {
-        wav_path: None,
+    let without_audio = SessionSummary {
+        audio_path: None,
         ..summary("session_2", "2026-05-11T10:00:00Z", &sessions_dir)
     };
 
     assert_eq!(
-        with_wav.metadata_path(&sessions_dir),
+        with_audio.metadata_path(&sessions_dir),
         PathBuf::from("/tmp/audio/session_1.json")
     );
     assert_eq!(
-        without_wav.metadata_path(&sessions_dir),
+        without_audio.metadata_path(&sessions_dir),
         sessions_dir.join("session_2.json")
     );
 }
@@ -88,8 +91,8 @@ fn upsert_writes_metadata_and_lists_newest_first() {
         "2026-05-11T11:00:00Z",
         &sessions_dir,
     );
-    std::fs::write(older.wav_path.as_deref().unwrap(), b"wav").unwrap();
-    std::fs::write(newer.wav_path.as_deref().unwrap(), b"wav").unwrap();
+    std::fs::write(older.audio_path.as_deref().unwrap(), b"wav").unwrap();
+    std::fs::write(newer.audio_path.as_deref().unwrap(), b"wav").unwrap();
     std::fs::write(
         older.transcript_path.as_deref().unwrap(),
         "[00:00] [Speaker 1]: Hello",
@@ -118,7 +121,7 @@ fn reload_populates_preview_and_drops_missing_paths() {
     std::fs::create_dir_all(&sessions_dir).unwrap();
 
     let present = summary("session_present", "2026-05-11T10:00:00Z", &sessions_dir);
-    std::fs::write(present.wav_path.as_deref().unwrap(), b"wav").unwrap();
+    std::fs::write(present.audio_path.as_deref().unwrap(), b"wav").unwrap();
     std::fs::write(
         present.transcript_path.as_deref().unwrap(),
         "[00:00] [Speaker 1]: Hello there\n[00:03] [Speaker 2]: General Kenobi",
@@ -136,7 +139,7 @@ fn reload_populates_preview_and_drops_missing_paths() {
         present.transcript_preview.as_deref(),
         Some("Hello there General Kenobi")
     );
-    assert!(missing.wav_path.is_none());
+    assert!(missing.audio_path.is_none());
     assert!(missing.transcript_path.is_none());
 }
 
@@ -150,16 +153,16 @@ fn clear_and_delete_session_files_update_cache_and_disk() {
         "2026-05-11T12:00:00Z",
         &sessions_dir,
     );
-    let wav = PathBuf::from(session.wav_path.as_deref().unwrap());
+    let audio = PathBuf::from(session.audio_path.as_deref().unwrap());
     let transcript = PathBuf::from(session.transcript_path.as_deref().unwrap());
-    std::fs::write(&wav, b"wav").unwrap();
+    std::fs::write(&audio, b"wav").unwrap();
     std::fs::write(&transcript, "transcript").unwrap();
     store.upsert(session.clone()).unwrap();
 
-    let cleared = store.clear_wav(&session.id).unwrap();
-    assert!(cleared.wav_path.is_none());
-    assert!(!wav.exists());
-    assert_eq!(store.clear_all_wavs().unwrap(), 0);
+    let cleared = store.clear_audio(&session.id).unwrap();
+    assert!(cleared.audio_path.is_none());
+    assert!(!audio.exists());
+    assert_eq!(store.clear_all_audio().unwrap(), 0);
 
     assert_eq!(store.delete_all().unwrap(), 1);
     assert!(store.list().is_empty());

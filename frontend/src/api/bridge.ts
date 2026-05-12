@@ -106,14 +106,14 @@ export function deleteSession(sessionId: string): Promise<void> {
   return invoke("delete_session", { sessionId });
 }
 
-export function clearSessionWav(sessionId: string): Promise<SessionSummary> {
-  return invoke("clear_session_wav", { sessionId });
+export function clearSessionAudio(sessionId: string): Promise<SessionSummary> {
+  return invoke("clear_session_audio", { sessionId });
 }
 
 export function deleteAllSessions(): Promise<number> {
   return invoke("delete_all_sessions");
 }
 
-export function clearAllWavs(): Promise<number> {
-  return invoke("clear_all_wavs");
+export function clearAllAudio(): Promise<number> {
+  return invoke("clear_all_audio");
 }

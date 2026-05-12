@@ -5,6 +5,7 @@ pub mod types;
 
 use std::path::PathBuf;
 
+use crate::audio::format::AudioFormat;
 use crate::error::{AppError, AppResult};
 use crate::settings::Settings;
 use crate::transcription::types::{
@@ -39,17 +40,18 @@ pub async fn transcribe(
     provider: TranscriptionProvider,
     key: String,
     settings: &Settings,
-    wav_path: PathBuf,
+    audio_path: PathBuf,
+    audio_format: AudioFormat,
 ) -> AppResult<TranscriptionOutcome> {
     match provider {
         TranscriptionProvider::Gemini => {
-            providers::gemini::transcribe(key, settings, wav_path).await
+            providers::gemini::transcribe(key, settings, audio_path, audio_format).await
         }
         TranscriptionProvider::Openai => {
-            providers::openai::transcribe(key, settings, wav_path).await
+            providers::openai::transcribe(key, settings, audio_path, audio_format).await
         }
         TranscriptionProvider::Deepgram => {
-            providers::deepgram::transcribe(key, settings, wav_path).await
+            providers::deepgram::transcribe(key, settings, audio_path, audio_format).await
         }
     }
 }
