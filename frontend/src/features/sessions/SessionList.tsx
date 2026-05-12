@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Archive, RefreshCw, Trash2, Upload } from "lucide-react";
 import type { SessionSummary } from "../../api/types";
 import {
@@ -17,6 +17,10 @@ type Props = {
   githubSyncEnabled: boolean;
 };
 
+const FILTERS = ["All", "Pending", "Failed", "Synced"] as const;
+type Filter = (typeof FILTERS)[number];
+type Bucket = "today" | "earlier";
+
 export function SessionList({
   sessions,
   selectedId,
@@ -25,23 +29,70 @@ export function SessionList({
   onSessionRemoved,
   githubSyncEnabled,
 }: Props) {
-  if (sessions.length === 0) {
-    return <div className="empty">No sessions yet. Record to create one.</div>;
-  }
+  const [filter, setFilter] = useState<Filter>("All");
+  const visible = useMemo(
+    () => sessions.filter((session) => matchesFilter(session, filter)),
+    [sessions, filter]
+  );
+
   return (
-    <div className="session-list" role="list">
-      {sessions.map((s) => (
-        <SessionRow
-          key={s.id}
-          session={s}
-          selected={s.id === selectedId}
-          onSelect={onSelect}
-          onSessionUpdated={onSessionUpdated}
-          onSessionRemoved={onSessionRemoved}
-          githubSyncEnabled={githubSyncEnabled}
-        />
-      ))}
-    </div>
+    <aside className="sessions" aria-label="Sessions">
+      <div className="sessions__head">
+        <div className="sessions__title-row">
+          <h2 className="sessions__title">Sessions</h2>
+          <span className="sessions__count">{sessions.length} total</span>
+        </div>
+      </div>
+      <div className="sessions__filter-row" role="tablist" aria-label="Filter sessions">
+        {FILTERS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className="filter-chip"
+            role="tab"
+            aria-selected={filter === item}
+            onClick={() => setFilter(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      <div className="sessions__list" role="listbox" aria-label="Recorded sessions">
+        {sessions.length === 0 ? (
+          <div className="empty">No sessions yet. Record to create one.</div>
+        ) : visible.length === 0 ? (
+          <div className="empty">No sessions match this filter.</div>
+        ) : (
+          (["today", "earlier"] as const).map((bucket) => {
+            const rows = visible.filter((session) => bucketOf(session.startedAt) === bucket);
+            if (rows.length === 0) return null;
+            return (
+              <div
+                key={bucket}
+                className="sessions__group"
+                data-muted={bucket !== "today"}
+              >
+                <div className="sessions__group-label">
+                  {bucket === "today" ? "Today" : "Earlier"}
+                </div>
+                {rows.map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    selected={session.id === selectedId}
+                    onSelect={onSelect}
+                    onSessionUpdated={onSessionUpdated}
+                    onSessionRemoved={onSessionRemoved}
+                    githubSyncEnabled={githubSyncEnabled}
+                  />
+                ))}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </aside>
   );
 }
 
@@ -167,9 +218,9 @@ function SessionRow({
 
   return (
     <div
-      role="listitem"
+      role="option"
       className="session-row"
-      data-selected={selected}
+      aria-selected={selected}
       tabIndex={0}
       onClick={() => onSelect(session.id)}
       onKeyDown={(e) => {
@@ -179,55 +230,38 @@ function SessionRow({
         }
       }}
     >
-      <div className="session-row-head">
-        <span className="session-row-id">{session.id}</span>
-        <span className="session-row-time">{formatDate(session.startedAt)}</span>
-      </div>
-      {session.transcriptPreview && (
-        <div className="session-row-preview">{session.transcriptPreview}</div>
+      <span className="session-row__title">{formatTime(session.startedAt)}</span>
+      {bucketOf(session.startedAt) === "earlier" && (
+        <span className="session-row__date">{formatShortDate(session.startedAt)}</span>
       )}
-      <div className="session-row-meta">
-        <span className="session-row-quant">
-          {formatSeconds(session.durationSeconds)}
-          {session.audioPath && (
-            <>
-              <span className="session-row-dot" aria-hidden>·</span>
-              <span>{session.audioFormat.toUpperCase()}</span>
-            </>
-          )}
-          {providerModel(session) && (
-            <>
-              <span className="session-row-dot" aria-hidden>·</span>
-              <span>{providerModel(session)}</span>
-            </>
-          )}
-          {typeof session.transcriptionCostUsd === "number" && (
-            <>
-              <span className="session-row-dot" aria-hidden>·</span>
-              <span
-                title={
-                  session.transcriptionUsage
-                    ? formatUsageTitle(session)
-                    : session.transcriptionTotalTokens
-                    ? `${formatTokens(session.transcriptionPromptTokens ?? 0)} in · ${formatTokens(
-                        session.transcriptionOutputTokens ?? 0
-                      )} out${modelSuffix(session)}`
-                    : providerModel(session) || undefined
-                }
-                className="session-row-cost"
-              >
-                {formatUsd(session.transcriptionCostUsd)}
-              </span>
-            </>
-          )}
-        </span>
-        <span className="session-row-tag" data-state={transStatus}>
-          {labelTrans(transStatus, transcriptBusy)}
-        </span>
-        <span className="session-row-tag" data-state={syncStatus}>
-          {labelSync(syncStatus, syncing)}
-        </span>
-        <div className="spacer" />
+      <div className="session-row__meta">
+        <span className="num">{formatSeconds(session.durationSeconds)}</span>
+        {typeof session.transcriptionCostUsd === "number" && (
+          <>
+            <span className="sep" aria-hidden />
+            <span className="num" title={formatUsageTitle(session)}>
+              {formatUsd(session.transcriptionCostUsd)}
+            </span>
+          </>
+        )}
+        {session.transcriptionStatus !== "complete" && (
+          <>
+            <span className="sep" aria-hidden />
+            <span className="session-row-tag" data-state={transStatus}>
+              {labelTrans(transStatus, transcriptBusy)}
+            </span>
+          </>
+        )}
+        {session.syncStatus === "synced" || session.syncStatus === "failed" ? (
+          <>
+            <span className="sep" aria-hidden />
+            <span className="session-row-tag" data-state={syncStatus}>
+              {labelSync(syncStatus, syncing)}
+            </span>
+          </>
+        ) : null}
+      </div>
+      <div className="session-row__actions" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           className="btn btn-icon"
@@ -303,23 +337,59 @@ function SessionRow({
   );
 }
 
-function formatDate(iso: string): string {
+function matchesFilter(session: SessionSummary, filter: Filter): boolean {
+  if (filter === "All") return true;
+  if (filter === "Pending") {
+    return (
+      session.transcriptionStatus === "pending" ||
+      session.transcriptionStatus === "transcribing" ||
+      session.transcriptionStatus === "not_started"
+    );
+  }
+  if (filter === "Failed") {
+    return session.transcriptionStatus === "failed" || session.syncStatus === "failed";
+  }
+  return session.syncStatus === "synced";
+}
+
+function bucketOf(iso: string): Bucket {
+  const date = new Date(iso);
+  const now = new Date();
+  const startToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  return date.getTime() >= startToday ? "today" : "earlier";
+}
+
+function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
-      month: "short",
-      day: "2-digit",
     });
   } catch {
     return iso;
   }
 }
 
+function formatShortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
 function formatSeconds(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function formatUsd(n: number): string {

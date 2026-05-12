@@ -1,29 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Settings as SettingsIcon } from "lucide-react";
-import { SetupRail } from "./features/setup/SetupRail";
-import { InlineSetup } from "./features/setup/InlineSetup";
 import { RecorderPanel } from "./features/recorder/RecorderPanel";
 import { SessionList } from "./features/sessions/SessionList";
 import { TranscriptDrawer } from "./features/sessions/TranscriptDrawer";
-import { SettingsSheet } from "./features/settings/SettingsSheet";
-import { Archive, Trash2, X } from "lucide-react";
+import {
+  SettingsSheet,
+  type SettingsSection,
+} from "./features/settings/SettingsSheet";
 import type { AppStatus, SessionSummary, Settings } from "./api/types";
 import {
-  clearAllAudio,
-  deleteAllSessions,
   getAppStatus,
   getSettings,
   listSessions,
-  selectSessionsFolder,
 } from "./api/bridge";
-
-export type SetupPanelKey =
-  | "parser"
-  | "folder"
-  | "mic"
-  | "systemAudio"
-  | "github"
-  | null;
 
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
@@ -32,8 +21,9 @@ export function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null
   );
-  const [openPanel, setOpenPanel] = useState<SetupPanelKey>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("setup");
   const [error, setError] = useState<string | null>(null);
 
   const refreshStatus = useCallback(async () => {
@@ -69,43 +59,28 @@ export function App() {
     refreshSessions();
   }, [refreshStatus, refreshSettings, refreshSessions]);
 
-  // Progressive setup: if required items are missing, auto-open the first one.
-  // Folder is also auto-picked natively on first run when missing — matches
-  // the spec's "open native folder picker" behavior.
-  const folderAutoPickedRef = useRef(false);
+  const setupOpenedRef = useRef(false);
   useEffect(() => {
     if (!status) return;
+    if (!status.canRecord && !settingsOpen && !setupOpenedRef.current) {
+      setupOpenedRef.current = true;
+      setSettingsSection("setup");
+      setSettingsOpen(true);
+    }
+  }, [status, settingsOpen]);
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      setSelectedSessionId(null);
+      return;
+    }
     if (
-      !folderAutoPickedRef.current &&
-      status.folder.state === "missing"
+      !selectedSessionId ||
+      !sessions.some((session) => session.id === selectedSessionId)
     ) {
-      folderAutoPickedRef.current = true;
-      selectSessionsFolder()
-        .then(async () => {
-          await refreshStatus();
-          await refreshSettings();
-        })
-        .catch(() => {
-          setOpenPanel("folder");
-        });
-      return;
+      setSelectedSessionId(sessions[0]?.id ?? null);
     }
-    if (openPanel !== null) return;
-    if (
-      status.transcription.state !== "ready" &&
-      status.transcription.state !== "warning"
-    ) {
-      setOpenPanel("parser");
-      return;
-    }
-    if (status.folder.state !== "ready") {
-      setOpenPanel("folder");
-      return;
-    }
-    if (status.mic.state === "denied" || status.mic.state === "missing") {
-      setOpenPanel("mic");
-    }
-  }, [status, openPanel, refreshStatus, refreshSettings]);
+  }, [sessions, selectedSessionId]);
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) ?? null,
@@ -123,6 +98,11 @@ export function App() {
     : status.canRecord
     ? "ready"
     : "missing";
+
+  const openSettings = useCallback((section: SettingsSection = "setup") => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  }, []);
 
   const handleSessionCompleted = useCallback(
     (session: SessionSummary) => {
@@ -143,36 +123,6 @@ export function App() {
     setSessions((prev) => prev.filter((s) => s.id !== id));
     setSelectedSessionId((prev) => (prev === id ? null : prev));
   }, []);
-
-  async function doDeleteAllSessions() {
-    if (sessions.length === 0) return;
-    const ok = window.confirm(
-      `Delete all ${sessions.length} sessions?\n\nRemoves every audio file, transcript, and metadata file. This cannot be undone.`
-    );
-    if (!ok) return;
-    try {
-      await deleteAllSessions();
-      setSessions([]);
-      setSelectedSessionId(null);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  async function doClearAllAudio() {
-    const withAudio = sessions.filter((s) => s.audioPath).length;
-    if (withAudio === 0) return;
-    const ok = window.confirm(
-      `Clear audio from ${withAudio} session${withAudio === 1 ? "" : "s"}?\n\nKeeps transcripts and metadata. Retranscription won't be possible after this.`
-    );
-    if (!ok) return;
-    try {
-      await clearAllAudio();
-      await refreshSessions();
-    } catch (e) {
-      setError(String(e));
-    }
-  }
 
   return (
     <div className="app">
@@ -195,7 +145,7 @@ export function App() {
             type="button"
             className="btn btn-icon"
             aria-label="Open settings"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => openSettings("setup")}
           >
             <SettingsIcon size={16} />
           </button>
@@ -204,140 +154,45 @@ export function App() {
 
       <main className="app-main">
         <section className="app-main-left">
-          <div className="panel">
-            <h2 className="panel-title">Setup</h2>
-            <SetupRail
-              status={status}
-              openPanel={openPanel}
-              onToggle={(key) =>
-                setOpenPanel((prev) => (prev === key ? null : key))
-              }
-            />
-          </div>
+          <RecorderPanel
+            status={status}
+            settings={settings}
+            onCompleted={handleSessionCompleted}
+            onSessionUpdated={handleSessionUpdated}
+            onRefreshStatus={refreshStatus}
+            onOpenSettings={openSettings}
+          />
 
-          {openPanel && (
-            <InlineSetup
-              panel={openPanel}
-              status={status}
-              settings={settings}
-              onClose={() => setOpenPanel(null)}
-              onChanged={async () => {
-                await refreshStatus();
-                await refreshSettings();
-              }}
-            />
-          )}
-
-          <div className="panel">
-            <h2 className="panel-title">Recorder</h2>
-            <RecorderPanel
-              status={status}
-              settings={settings}
-              onCompleted={handleSessionCompleted}
+          {selectedSession ? (
+            <TranscriptDrawer
+              session={selectedSession}
               onSessionUpdated={handleSessionUpdated}
-              onRefreshStatus={refreshStatus}
             />
-          </div>
-
-          {selectedSession && (
-            <>
-              <div
-                className="transcript-scrim"
-                onClick={() => setSelectedSessionId(null)}
-                aria-hidden
-              />
-              <div
-                className="panel transcript-drawer"
-                role="dialog"
-                aria-label={`Transcript for ${selectedSession.id}`}
-              >
-                <div className="inline-setup-title">
-                  <h3 style={{ margin: 0, fontSize: 14 }}>
-                    Transcript — {selectedSession.id}
-                  </h3>
-                  <button
-                    type="button"
-                    className="btn btn-icon transcript-drawer-close"
-                    aria-label="Close transcript"
-                    onClick={() => setSelectedSessionId(null)}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <TranscriptDrawer
-                  session={selectedSession}
-                  onSessionUpdated={handleSessionUpdated}
-                />
+          ) : (
+            <section className="transcript" aria-label="Transcript">
+              <div className="transcript__body">
+                <div className="empty">No sessions yet. Record to create one.</div>
               </div>
-            </>
+            </section>
           )}
         </section>
 
-        <aside className="app-main-right">
-          <div
-            className="panel panel-list"
-            style={{ flex: 1, minHeight: 0 }}
-          >
-            <div className="panel-list-head">
-              <h3>Sessions</h3>
-              <div className="row" style={{ gap: 2 }}>
-                <span
-                  className="muted"
-                  style={{ fontSize: 12, marginRight: 4 }}
-                >
-                  {sessions.length} total
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-icon"
-                  aria-label="Clear all audio"
-                  title="Clear audio for every session (keeps transcripts)"
-                  disabled={sessions.every((s) => !s.audioPath)}
-                  onClick={doClearAllAudio}
-                >
-                  <Archive size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-icon btn-danger"
-                  aria-label="Delete all sessions"
-                  title="Delete all sessions (audio + transcript + metadata)"
-                  disabled={sessions.length === 0}
-                  onClick={doDeleteAllSessions}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-            <SessionList
-              sessions={sessions}
-              selectedId={selectedSessionId}
-              onSelect={setSelectedSessionId}
-              onSessionUpdated={handleSessionUpdated}
-              onSessionRemoved={handleSessionRemoved}
-              githubSyncEnabled={settings?.githubSyncEnabled ?? false}
-            />
-          </div>
-        </aside>
+        <div className="app-main-right">
+          <SessionList
+            sessions={sessions}
+            selectedId={selectedSessionId}
+            onSelect={setSelectedSessionId}
+            onSessionUpdated={handleSessionUpdated}
+            onSessionRemoved={handleSessionRemoved}
+            githubSyncEnabled={settings?.githubSyncEnabled ?? false}
+          />
+        </div>
       </main>
 
       {error && (
         <div
           role="alert"
-          style={{
-            position: "fixed",
-            bottom: 16,
-            left: 16,
-            right: 16,
-            maxWidth: 520,
-            margin: "0 auto",
-            background: "var(--surface)",
-            border: "1px solid var(--error)",
-            color: "var(--error)",
-            padding: "10px 14px",
-            borderRadius: "var(--radius)",
-            fontSize: 13,
-          }}
+          className="app-toast app-toast--error"
         >
           <div className="row">
             <span>{error}</span>
@@ -356,10 +211,16 @@ export function App() {
       {settingsOpen && settings && (
         <SettingsSheet
           settings={settings}
+          status={status}
+          initialSection={settingsSection}
           onClose={() => setSettingsOpen(false)}
           onSaved={async (next) => {
             setSettings(next);
             await refreshStatus();
+          }}
+          onChanged={async () => {
+            await refreshStatus();
+            await refreshSettings();
           }}
         />
       )}
