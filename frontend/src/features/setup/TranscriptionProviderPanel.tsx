@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Eye, EyeOff, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
 import type {
   AppStatus,
+  ProviderStatus,
   Settings,
   TranscriptionProvider,
 } from "../../api/types";
@@ -35,61 +36,86 @@ export function TranscriptionProviderPanel({
   settings,
   onChanged,
 }: Props) {
-  const [provider, setProvider] = useState<TranscriptionProvider>(
+  const [editProvider, setEditProvider] = useState<TranscriptionProvider>(
     settings?.transcriptionProvider ?? "gemini"
   );
   const [key, setKey] = useState("");
   const [model, setModel] = useState("");
   const [reveal, setReveal] = useState(false);
+  const [replacingKey, setReplacingKey] = useState(false);
+  const [savingActive, setSavingActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [msg, setMsg] = useState<{
     kind: "success" | "error" | "info";
     text: string;
   } | null>(null);
+  const initializedFromSettings = useRef(false);
 
   useEffect(() => {
-    if (!settings) return;
-    setProvider(settings.transcriptionProvider);
+    if (!settings || initializedFromSettings.current) return;
+    setEditProvider(settings.transcriptionProvider);
+    initializedFromSettings.current = true;
   }, [settings]);
 
   useEffect(() => {
     if (!settings) return;
-    setModel(modelFor(settings, provider));
-    setKey("");
-    setMsg(null);
-  }, [settings, provider]);
+    setModel(modelFor(settings, editProvider));
+  }, [settings, editProvider]);
 
-  const providerStatus = status?.providers?.[provider];
+  useEffect(() => {
+    setKey("");
+    setReveal(false);
+    setReplacingKey(false);
+    setMsg(null);
+  }, [editProvider]);
+
+  const activeProvider = settings?.transcriptionProvider ?? "gemini";
+  const activeProviderStatus = status?.providers?.[activeProvider];
+  const providerStatus = status?.providers?.[editProvider];
   const modelOptions = modelOptionsWithCurrent(
-    modelOptionsForProvider(provider),
+    modelOptionsForProvider(editProvider),
     model
   );
-  const hasKey =
-    providerStatus?.state === "ready" || providerStatus?.state === "warning";
+  const hasKey = providerHasSavedKey(providerStatus);
+  const showKeyInput = !hasKey || replacingKey;
   const canValidate = hasKey || key.trim().length > 0;
 
   const warning = useMemo(() => {
     if (!settings) return null;
     if (
-      provider === "openai" &&
+      editProvider === "openai" &&
       model === "whisper-1" &&
       settings.includeSpeakerLabels
     ) {
       return "whisper-1 will not label speakers. Use gpt-4o-transcribe-diarize for speaker-aware output.";
     }
     return null;
-  }, [settings, provider, model]);
+  }, [settings, editProvider, model]);
 
-  async function chooseProvider(next: TranscriptionProvider) {
-    setProvider(next);
+  function chooseProvider(next: TranscriptionProvider) {
+    setEditProvider(next);
+  }
+
+  async function saveActiveProvider(next: TranscriptionProvider) {
     setMsg(null);
     if (!settings || next === settings.transcriptionProvider) return;
+    setSavingActive(true);
     try {
       await saveSettings({ transcriptionProvider: next });
+      setEditProvider(next);
+      const nextStatus = status?.providers?.[next];
+      setMsg({
+        kind: providerHasSavedKey(nextStatus) ? "success" : "info",
+        text: providerHasSavedKey(nextStatus)
+          ? `${LABELS[next]} is now the active parser.`
+          : `${LABELS[next]} is now active. Add its API key before recording.`,
+      });
       await onChanged();
     } catch (e) {
       setMsg({ kind: "error", text: String(e) });
+    } finally {
+      setSavingActive(false);
     }
   }
 
@@ -101,8 +127,8 @@ export function TranscriptionProviderPanel({
       return;
     }
     try {
-      await saveSettings(modelInput(provider, trimmed));
-      setMsg({ kind: "success", text: "Parser settings saved." });
+      await saveSettings(modelInput(editProvider, trimmed));
+      setMsg({ kind: "success", text: `${LABELS[editProvider]} model saved.` });
       await onChanged();
     } catch (e) {
       setMsg({ kind: "error", text: String(e) });
@@ -117,12 +143,14 @@ export function TranscriptionProviderPanel({
     setSaving(true);
     setMsg(null);
     try {
-      const result = await saveTranscriptionKey(provider, key.trim());
+      const result = await saveTranscriptionKey(editProvider, key.trim());
       setMsg({
         kind: result.state === "ready" ? "success" : "error",
         text: result.detail || "Key saved.",
       });
       setKey("");
+      setReveal(false);
+      setReplacingKey(false);
       await onChanged();
     } catch (e) {
       setMsg({ kind: "error", text: String(e) });
@@ -136,7 +164,7 @@ export function TranscriptionProviderPanel({
     setMsg(null);
     try {
       const typed = key.trim();
-      const result = await validateTranscriptionKey(provider, typed || undefined);
+      const result = await validateTranscriptionKey(editProvider, typed || undefined);
       setMsg({
         kind: result.state === "ready" ? "success" : "error",
         text: result.detail || "Validation complete.",
@@ -151,12 +179,15 @@ export function TranscriptionProviderPanel({
 
   async function doDelete() {
     const ok = window.confirm(
-      `Remove the saved ${LABELS[provider]} API key? You can paste it again later.`
+      `Remove the saved ${LABELS[editProvider]} API key? You can paste it again later.`
     );
     if (!ok) return;
     setMsg(null);
     try {
-      await deleteTranscriptionKey(provider);
+      await deleteTranscriptionKey(editProvider);
+      setKey("");
+      setReveal(false);
+      setReplacingKey(false);
       setMsg({ kind: "info", text: "Key removed." });
       await onChanged();
     } catch (e) {
@@ -166,16 +197,73 @@ export function TranscriptionProviderPanel({
 
   return (
     <div className="inline-setup-body">
-      <div className="segmented" role="tablist" aria-label="Transcription parser">
+      <div className="field">
+        <label className="field-label" htmlFor="active-parser">
+          Active parser
+        </label>
+        <div className="row">
+          <select
+            id="active-parser"
+            className="input"
+            value={activeProvider}
+            disabled={!settings || savingActive}
+            onChange={(e) =>
+              saveActiveProvider(e.target.value as TranscriptionProvider)
+            }
+          >
+            {PROVIDERS.map((p) => (
+              <option key={p} value={p}>
+                {LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <span
+            className="parser-status-pill"
+            data-state={activeProviderStatus?.state ?? "checking"}
+          >
+            <span
+              className="dot"
+              data-state={activeProviderStatus?.state ?? "checking"}
+            />
+            {activeProviderStatus
+              ? providerStatusLabel(activeProviderStatus)
+              : "Checking"}
+          </span>
+        </div>
+        <div className="field-hint">
+          New recordings use {LABELS[activeProvider]} unless you change this.
+        </div>
+      </div>
+
+      <div
+        className="parser-provider-list"
+        role="tablist"
+        aria-label="Provider key and model settings"
+      >
         {PROVIDERS.map((p) => (
           <button
             key={p}
             type="button"
-            className="btn"
-            data-selected={provider === p}
+            className="parser-provider-option"
+            data-selected={editProvider === p}
+            data-active={activeProvider === p}
             onClick={() => chooseProvider(p)}
           >
-            {LABELS[p]}
+            <span className="parser-provider-main">
+              <span>{LABELS[p]}</span>
+              {activeProvider === p && (
+                <span className="parser-status-pill" data-state="ready">
+                  Active
+                </span>
+              )}
+            </span>
+            <span className="parser-provider-sub">
+              <span
+                className="dot"
+                data-state={status?.providers?.[p]?.state ?? "checking"}
+              />
+              {providerStatusLabel(status?.providers?.[p])}
+            </span>
           </button>
         ))}
       </div>
@@ -185,9 +273,30 @@ export function TranscriptionProviderPanel({
         to settings, logs, transcripts, or session metadata.
       </p>
 
+      <div className="parser-editor-head">
+        <div>
+          <div className="field-label">{LABELS[editProvider]} settings</div>
+          <div className="field-hint">
+            {editProvider === activeProvider
+              ? "This provider is currently used for recording."
+              : `Editing ${LABELS[editProvider]} does not change the active parser.`}
+          </div>
+        </div>
+        {editProvider !== activeProvider && (
+          <button
+            type="button"
+            className="btn"
+            disabled={savingActive || !settings}
+            onClick={() => saveActiveProvider(editProvider)}
+          >
+            Use as active
+          </button>
+        )}
+      </div>
+
       <div className="field">
         <label className="field-label" htmlFor="parser-model">
-          Model
+          {LABELS[editProvider]} model
         </label>
         <div className="row">
           <select
@@ -210,57 +319,118 @@ export function TranscriptionProviderPanel({
       </div>
 
       <div className="field">
-        <label className="field-label" htmlFor="parser-key">
-          {hasKey ? `Replace ${LABELS[provider]} key` : `Paste ${LABELS[provider]} key`}
-        </label>
-        <div className="row">
-          <input
-            id="parser-key"
-            className="input"
-            type={reveal ? "text" : "password"}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={keyPlaceholder(provider)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label={reveal ? "Hide key" : "Reveal key"}
-            onClick={() => setReveal((p) => !p)}
-          >
-            {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-        </div>
-      </div>
+        <div className="field-label">{LABELS[editProvider]} API key</div>
 
-      <div className="row">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={saving || !key.trim()}
-          onClick={doSaveKey}
-        >
-          {saving ? "Saving..." : "Save key"}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={validating || !canValidate}
-          onClick={doValidate}
-        >
-          <Check size={14} />
-          {validating ? "Validating..." : "Validate"}
-        </button>
-        <div className="spacer" />
-        {hasKey && (
-          <button type="button" className="btn btn-danger" onClick={doDelete}>
-            <Trash2 size={14} />
-            Remove
-          </button>
+        {hasKey && !showKeyInput && (
+          <div className="stored-secret">
+            <div className="stored-secret-main">
+              <div className="stored-secret-title">
+                {providerStatus?.state === "warning" ? (
+                  <AlertTriangle size={14} />
+                ) : (
+                  <KeyRound size={14} />
+                )}
+                <span>Key saved</span>
+              </div>
+              <div className="field-hint">
+                {providerStatus?.detail || "Stored in the OS credential store."}
+              </div>
+            </div>
+            <div className="row stored-secret-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setReplacingKey(true)}
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={validating}
+                onClick={doValidate}
+              >
+                <Check size={14} />
+                {validating ? "Validating..." : "Validate"}
+              </button>
+              <button type="button" className="btn btn-danger" onClick={doDelete}>
+                <Trash2 size={14} />
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showKeyInput && (
+          <>
+            <div className="row">
+              <input
+                id="parser-key"
+                className="input"
+                type={reveal ? "text" : "password"}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder={
+                  hasKey
+                    ? "Paste a replacement key"
+                    : keyPlaceholder(editProvider)
+                }
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="btn btn-icon"
+                aria-label={reveal ? "Hide key" : "Reveal key"}
+                onClick={() => setReveal((p) => !p)}
+              >
+                {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            {hasKey && (
+              <div className="field-hint">
+                Leave this blank to keep the saved key.
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {showKeyInput && (
+        <div className="row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving || !key.trim()}
+            onClick={doSaveKey}
+          >
+            {saving ? "Saving..." : hasKey ? "Save replacement" : "Save key"}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={validating || !canValidate}
+            onClick={doValidate}
+          >
+            <Check size={14} />
+            {validating ? "Validating..." : "Validate"}
+          </button>
+          <div className="spacer" />
+          {hasKey && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setReplacingKey(false);
+                setKey("");
+                setReveal(false);
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
 
       {msg && (
         <div
@@ -275,12 +445,30 @@ export function TranscriptionProviderPanel({
           {msg.text}
         </div>
       )}
-
-      {hasKey && !msg && providerStatus?.detail && (
-        <div className="field-hint">{providerStatus.detail}</div>
-      )}
     </div>
   );
+}
+
+function providerHasSavedKey(status?: ProviderStatus): boolean {
+  return status?.state === "ready" || status?.state === "warning";
+}
+
+function providerStatusLabel(status?: ProviderStatus): string {
+  if (!status) return "Checking";
+  switch (status.state) {
+    case "ready":
+      return "Key saved";
+    case "warning":
+      return "Key saved, warning";
+    case "missing":
+      return "No key";
+    case "denied":
+      return "Key issue";
+    case "checking":
+      return "Checking";
+    case "optional":
+      return "Optional";
+  }
 }
 
 function modelFor(settings: Settings, provider: TranscriptionProvider): string {

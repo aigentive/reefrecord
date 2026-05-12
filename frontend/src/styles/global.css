@@ -354,6 +354,132 @@ textarea.input {
   color: var(--text);
 }
 
+.parser-provider-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.parser-provider-option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  box-shadow: var(--shadow-xs);
+}
+
+.parser-provider-option:hover {
+  border-color: var(--border-strong);
+  background: var(--paper-50);
+}
+
+.parser-provider-option[data-selected="true"] {
+  border-color: var(--teal-500);
+  box-shadow: var(--focus-ring);
+}
+
+.parser-provider-option[data-active="true"] {
+  background: var(--paper-0);
+}
+
+.parser-provider-main,
+.parser-provider-sub,
+.stored-secret-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.parser-provider-main {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.parser-provider-sub {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.parser-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--paper-50);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.parser-status-pill[data-state="ready"] {
+  border-color: var(--teal-200);
+  background: var(--teal-50);
+  color: var(--teal-800);
+}
+
+.parser-status-pill[data-state="warning"] {
+  border-color: var(--warning);
+  background: var(--paper-50);
+  color: var(--teal-900);
+}
+
+.parser-status-pill[data-state="missing"],
+.parser-status-pill[data-state="denied"] {
+  border-color: var(--coral);
+  background: var(--paper-50);
+  color: var(--coral);
+}
+
+.parser-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.stored-secret {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper-50);
+}
+
+.stored-secret-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stored-secret-title {
+  color: var(--teal-800);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stored-secret-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .cost-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

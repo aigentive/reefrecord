@@ -124,18 +124,30 @@ export function SettingsSheet({ settings, onClose, onSaved }: Props) {
           <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>Transcription</h3>
 
-            <div className="segmented" role="group" aria-label="Active parser">
-              {(["gemini", "openai", "deepgram"] as const).map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  className="btn"
-                  data-selected={draft.transcriptionProvider === provider}
-                  onClick={() => set("transcriptionProvider", provider)}
-                >
-                  {providerLabel(provider)}
-                </button>
-              ))}
+            <div className="field">
+              <label className="field-label" htmlFor="s-active-parser">
+                Active parser
+              </label>
+              <select
+                id="s-active-parser"
+                className="input"
+                value={draft.transcriptionProvider}
+                onChange={(e) =>
+                  set(
+                    "transcriptionProvider",
+                    e.target.value as Settings["transcriptionProvider"]
+                  )
+                }
+              >
+                {(["gemini", "openai", "deepgram"] as const).map((provider) => (
+                  <option key={provider} value={provider}>
+                    {providerLabel(provider)}
+                  </option>
+                ))}
+              </select>
+              <div className="field-hint">
+                Recording and default retranscription use this provider.
+              </div>
             </div>
 
             {draft.transcriptionProvider === "gemini" && (
