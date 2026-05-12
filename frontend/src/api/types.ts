@@ -12,10 +12,14 @@ export type ProviderStatus = {
   lastValidatedAt?: string;
 };
 
+export type TranscriptionProvider = "gemini" | "openai" | "deepgram";
+export type AudioFormat = "wav" | "flac";
+
 export type AppStatus = {
   mic: ProviderStatus;
   systemAudio: ProviderStatus;
-  gemini: ProviderStatus;
+  transcription: ProviderStatus;
+  providers: Record<TranscriptionProvider, ProviderStatus>;
   folder: ProviderStatus;
   github: ProviderStatus;
   git: ProviderStatus;
@@ -29,14 +33,26 @@ export type Settings = {
   captureSystemAudio: boolean;
   micDeviceSelector: string | null;
   systemAudioDeviceSelector: string | null;
+  transcriptionProvider: TranscriptionProvider;
+  audioStorageFormat: AudioFormat;
   geminiModel: string;
   geminiFallbackModel: string;
+  openaiModel: string;
+  openaiFallbackModel: string;
+  deepgramModel: string;
+  deepgramSmartFormat: boolean;
+  deepgramDiarize: boolean;
+  deepgramUtterances: boolean;
   chunkMinutes: number;
   languageHint: string;
   includeSpeakerLabels: boolean;
   includeTimestamps: boolean;
   geminiInputCostPerMillionUsd: number;
   geminiOutputCostPerMillionUsd: number;
+  openaiCostPerMinuteUsd: number;
+  openaiInputCostPerMillionUsd: number;
+  openaiOutputCostPerMillionUsd: number;
+  deepgramCostPerHourUsd: number;
   githubSyncEnabled: boolean;
   githubRepoUrl: string;
   githubTargetFolder: string;
@@ -73,22 +89,48 @@ export type SyncStatus =
   | "skipped"
   | "failed";
 
+export type TranscriptionUsage =
+  | {
+      kind: "tokens";
+      promptTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      audioTokens?: number | null;
+      textTokens?: number | null;
+    }
+  | {
+      kind: "duration";
+      seconds: number;
+    }
+  | {
+      kind: "deepgram";
+      requestId?: string | null;
+      durationSeconds?: number | null;
+      confidence?: number | null;
+    }
+  | {
+      kind: "unknown";
+    };
+
 export type SessionSummary = {
   id: string;
   startedAt: string;
   durationSeconds: number;
-  wavPath: string | null;
+  audioPath: string | null;
+  audioFormat: AudioFormat;
   transcriptPath: string | null;
   transcriptPreview?: string;
   micDeviceName: string | null;
   systemDeviceName: string | null;
   transcriptionStatus: TranscriptionStatus;
   transcriptionError?: string;
+  transcriptionProvider?: TranscriptionProvider | null;
   transcriptionPromptTokens?: number;
   transcriptionOutputTokens?: number;
   transcriptionTotalTokens?: number;
   transcriptionCostUsd?: number;
   transcriptionModel?: string;
+  transcriptionUsage?: TranscriptionUsage;
   syncStatus: SyncStatus;
   syncError?: string;
 };

@@ -1,4 +1,5 @@
 pub mod capture;
+pub mod format;
 pub mod resample;
 pub mod writer;
 

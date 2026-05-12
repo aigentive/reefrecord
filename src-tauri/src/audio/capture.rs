@@ -62,13 +62,16 @@ pub fn resolve_input_device(selector: Option<&str>, require_blackhole: bool) -> 
                 return Err(AppError::Audio(format!("no input device at index {idx}")));
             }
             let lower = sel_trim.to_lowercase();
-            if let Some(dev) = devices
-                .into_iter()
-                .find(|d| d.name().map(|n| n.to_lowercase().contains(&lower)).unwrap_or(false))
-            {
+            if let Some(dev) = devices.into_iter().find(|d| {
+                d.name()
+                    .map(|n| n.to_lowercase().contains(&lower))
+                    .unwrap_or(false)
+            }) {
                 return Ok(dev);
             }
-            return Err(AppError::Audio(format!("no input device matches {sel_trim:?}")));
+            return Err(AppError::Audio(format!(
+                "no input device matches {sel_trim:?}"
+            )));
         }
     }
     if require_blackhole {
@@ -95,9 +98,10 @@ pub fn start_capture(
 ) -> AppResult<InputCapture> {
     // Resolve upfront only to surface a friendly name and fail fast if the
     // device is missing; re-resolve on the worker thread where Stream lives.
-    let preview = resolve_input_device(selector.as_deref(), require_blackhole)?;
-    let device_name = preview.name().unwrap_or_else(|_| label.to_string());
-    drop(preview);
+    let device_name = {
+        let preview = resolve_input_device(selector.as_deref(), require_blackhole)?;
+        preview.name().unwrap_or_else(|_| label.to_string())
+    };
 
     let buffer: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::new()));
     let stop_flag = Arc::new(AtomicBool::new(false));

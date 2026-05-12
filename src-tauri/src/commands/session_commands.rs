@@ -1,23 +1,13 @@
-use serde::Serialize;
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::gemini::client::GeminiClient;
-use crate::gemini::transcription::{transcribe, TranscriptionJob};
-use crate::git_sync::{self, GitSyncStatus, SyncOutcome};
+use crate::git_sync::{self, GitSyncStatus};
 use crate::services::recording::RecordingInput;
-use crate::services::secrets;
-use crate::services::sessions::{SessionSummary, SyncStatus, TranscriptionStatus};
+use crate::services::session_sync::{self, SyncResult};
+use crate::services::session_transcription;
+use crate::services::sessions::SessionSummary;
+use crate::transcription::types::TranscriptionProvider;
 use crate::AppState;
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncResult {
-    pub session_id: String,
-    pub status: SyncStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-}
 
 #[tauri::command]
 pub async fn list_sessions(state: State<'_, AppState>) -> AppResult<Vec<SessionSummary>> {
@@ -45,74 +35,15 @@ pub async fn stop_recording(
 pub async fn transcribe_session(
     state: State<'_, AppState>,
     session_id: String,
+    provider: Option<TranscriptionProvider>,
 ) -> AppResult<SessionSummary> {
-    let key = secrets::read_gemini_key()?
-        .ok_or_else(|| AppError::Invalid("No Gemini API key saved.".into()))?;
-    let settings = state.settings.get();
-    let mut summary = state
-        .sessions
-        .get(&session_id)
-        .ok_or_else(|| AppError::NotFound(format!("session {session_id} not found")))?;
-
-    let wav_path = match summary.wav_path.clone() {
-        Some(p) if std::path::Path::new(&p).exists() => std::path::PathBuf::from(p),
-        _ => {
-            return Err(AppError::Invalid(
-                "WAV file is no longer on disk. Clear the session and re-record.".into(),
-            ));
-        }
-    };
-
-    summary.transcription_status = TranscriptionStatus::Transcribing;
-    summary.transcription_error = None;
-    summary.transcription_prompt_tokens = None;
-    summary.transcription_output_tokens = None;
-    summary.transcription_total_tokens = None;
-    summary.transcription_cost_usd = None;
-    summary.transcription_model = None;
-    state.sessions.upsert(summary.clone())?;
-
-    let client = GeminiClient::new(key)?;
-    let job = TranscriptionJob {
-        wav_path: wav_path.clone(),
-        primary_model: settings.gemini_model.clone(),
-        fallback_model: settings.gemini_fallback_model.clone(),
-        chunk_minutes: settings.chunk_minutes,
-        language_hint: settings.language_hint.clone(),
-        include_speaker_labels: settings.include_speaker_labels,
-        include_timestamps: settings.include_timestamps,
-    };
-    let transcript_path = wav_path.with_file_name(format!(
-        "{}_gemini.txt",
-        wav_path.file_stem().and_then(|s| s.to_str()).unwrap_or(&summary.id)
-    ));
-
-    match transcribe(&client, job).await {
-        Ok(outcome) => {
-            std::fs::write(&transcript_path, &outcome.text)?;
-            let usd = (outcome.usage.prompt_tokens as f64
-                * settings.gemini_input_cost_per_million_usd
-                + outcome.usage.output_tokens as f64
-                    * settings.gemini_output_cost_per_million_usd)
-                / 1_000_000.0;
-            summary.transcript_path = Some(transcript_path.to_string_lossy().to_string());
-            summary.transcription_status = TranscriptionStatus::Complete;
-            summary.transcription_error = None;
-            summary.transcription_prompt_tokens = Some(outcome.usage.prompt_tokens);
-            summary.transcription_output_tokens = Some(outcome.usage.output_tokens);
-            summary.transcription_total_tokens = Some(outcome.usage.total_tokens);
-            summary.transcription_cost_usd = Some(usd);
-            summary.transcription_model = Some(outcome.model_used);
-            state.sessions.upsert(summary.clone())?;
-            Ok(summary)
-        }
-        Err(e) => {
-            summary.transcription_status = TranscriptionStatus::Failed;
-            summary.transcription_error = Some(e.to_string());
-            state.sessions.upsert(summary.clone())?;
-            Err(e)
-        }
-    }
+    session_transcription::transcribe_session(
+        state.settings.as_ref(),
+        state.sessions.as_ref(),
+        session_id,
+        provider,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -137,69 +68,8 @@ pub async fn read_transcript(
 }
 
 #[tauri::command]
-pub async fn sync_session(
-    state: State<'_, AppState>,
-    session_id: String,
-) -> AppResult<SyncResult> {
-    let settings = state.settings.get();
-    let mut summary = state
-        .sessions
-        .get(&session_id)
-        .ok_or_else(|| AppError::NotFound(format!("session {session_id} not found")))?;
-
-    if !settings.github_sync_enabled {
-        summary.sync_status = SyncStatus::NotEnabled;
-        summary.sync_error = None;
-        state.sessions.upsert(summary.clone())?;
-        return Ok(SyncResult {
-            session_id: summary.id,
-            status: SyncStatus::NotEnabled,
-            message: Some("GitHub sync is disabled.".into()),
-        });
-    }
-
-    summary.sync_status = SyncStatus::Syncing;
-    summary.sync_error = None;
-    state.sessions.upsert(summary.clone())?;
-
-    let sessions_dir = state.sessions.sessions_dir()?;
-    let result = tokio::task::spawn_blocking({
-        let settings = settings.clone();
-        let session = summary.clone();
-        let sessions_dir = sessions_dir.clone();
-        move || git_sync::push_session(&settings, &session, &sessions_dir)
-    })
-    .await
-    .map_err(|e| AppError::Git(format!("join error: {e}")))?;
-
-    match result {
-        Ok(SyncOutcome::Synced) => {
-            summary.sync_status = SyncStatus::Synced;
-            summary.sync_error = None;
-            state.sessions.upsert(summary.clone())?;
-            Ok(SyncResult {
-                session_id: summary.id,
-                status: SyncStatus::Synced,
-                message: None,
-            })
-        }
-        Ok(SyncOutcome::Skipped) => {
-            summary.sync_status = SyncStatus::Skipped;
-            summary.sync_error = None;
-            state.sessions.upsert(summary.clone())?;
-            Ok(SyncResult {
-                session_id: summary.id,
-                status: SyncStatus::Skipped,
-                message: Some("Nothing new to push.".into()),
-            })
-        }
-        Err(e) => {
-            summary.sync_status = SyncStatus::Failed;
-            summary.sync_error = Some(e.to_string());
-            state.sessions.upsert(summary.clone())?;
-            Err(e)
-        }
-    }
+pub async fn sync_session(state: State<'_, AppState>, session_id: String) -> AppResult<SyncResult> {
+    session_sync::sync_session(state.settings.as_ref(), state.sessions.as_ref(), session_id).await
 }
 
 #[tauri::command]
@@ -214,11 +84,11 @@ pub async fn delete_session(state: State<'_, AppState>, session_id: String) -> A
 }
 
 #[tauri::command]
-pub async fn clear_session_wav(
+pub async fn clear_session_audio(
     state: State<'_, AppState>,
     session_id: String,
 ) -> AppResult<SessionSummary> {
-    state.sessions.clear_wav(&session_id)
+    state.sessions.clear_audio(&session_id)
 }
 
 #[tauri::command]
@@ -227,6 +97,6 @@ pub async fn delete_all_sessions(state: State<'_, AppState>) -> AppResult<usize>
 }
 
 #[tauri::command]
-pub async fn clear_all_wavs(state: State<'_, AppState>) -> AppResult<usize> {
-    state.sessions.clear_all_wavs()
+pub async fn clear_all_audio(state: State<'_, AppState>) -> AppResult<usize> {
+    state.sessions.clear_all_audio()
 }

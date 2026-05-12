@@ -1,9 +1,13 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 use tauri::State;
 
 use crate::error::AppResult;
 use crate::services::devices;
 use crate::services::secrets;
+use crate::transcription;
+use crate::transcription::types::TranscriptionProvider;
 use crate::AppState;
 
 #[derive(Debug, Clone, Serialize)]
@@ -52,7 +56,8 @@ impl ProviderStatusDto {
 pub struct AppStatusDto {
     pub mic: ProviderStatusDto,
     pub system_audio: ProviderStatusDto,
-    pub gemini: ProviderStatusDto,
+    pub transcription: ProviderStatusDto,
+    pub providers: BTreeMap<TranscriptionProvider, ProviderStatusDto>,
     pub folder: ProviderStatusDto,
     pub github: ProviderStatusDto,
     pub git: ProviderStatusDto,
@@ -73,12 +78,18 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
     } else if let Some(sel) = settings.mic_device_selector.as_deref() {
         match devices::resolve_device_selector(&devices, Some(sel)) {
             Some(d) => ProviderStatusDto::ready(d.name.clone()),
-            None => ProviderStatusDto::warning(format!("Selector {:?} not matched; will use default.", sel)),
+            None => ProviderStatusDto::warning(format!(
+                "Selector {:?} not matched; will use default.",
+                sel
+            )),
         }
     } else {
         match devices.iter().find(|d| d.is_default && !d.is_blackhole) {
             Some(d) => ProviderStatusDto::ready(d.name.clone()),
-            None => match devices.iter().find(|d| !d.is_blackhole && d.input_channels > 0) {
+            None => match devices
+                .iter()
+                .find(|d| !d.is_blackhole && d.input_channels > 0)
+            {
                 Some(d) => ProviderStatusDto::ready(d.name.clone()),
                 None => ProviderStatusDto::denied("No microphone-capable device."),
             },
@@ -109,18 +120,23 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
         }
     };
 
-    // Gemini key presence. Key lives in an AES-256-GCM encrypted file under
-    // the app config dir; the cached validation status is authoritative when
-    // set.
-    let cached_gemini = state.gemini_last_validation.read().await.clone();
-    let key_present = secrets::has_gemini_key();
-    let gemini_state = match (key_present, cached_gemini) {
-        (_, Some(v)) if v.state == "ready" || v.state == "warning" => v,
-        (true, Some(v)) => v,
-        (true, None) => ProviderStatusDto::ready("Key saved. Press Validate to test."),
-        (false, _) => ProviderStatusDto::missing("Paste a Gemini API key to enable transcription."),
-    };
-
+    let cached_validations = state.transcription_last_validation.read().await.clone();
+    let mut providers = BTreeMap::new();
+    for provider in TranscriptionProvider::all() {
+        providers.insert(provider, provider_status(provider, &cached_validations));
+    }
+    let mut transcription_state = providers
+        .get(&settings.transcription_provider)
+        .cloned()
+        .unwrap_or_else(|| ProviderStatusDto::missing("Select a transcription parser."));
+    if transcription_state.state == "ready" {
+        if let Some(warning) = transcription::capability_warning(&settings) {
+            transcription_state = ProviderStatusDto::warning(format!(
+                "{} ready. {warning}",
+                settings.transcription_provider.label()
+            ));
+        }
+    }
     // Sessions folder
     let folder = match settings.sessions_dir.as_deref() {
         Some(dir) => {
@@ -143,10 +159,17 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
         }
     } else {
         let v = crate::git_sync::validate(&settings);
-        if v.git_installed && (v.git_lfs_installed || !settings.git_lfs_enabled) && v.repo_url_valid && v.target_folder_safe {
+        if v.git_installed
+            && (v.git_lfs_installed || !settings.git_lfs_enabled)
+            && v.repo_url_valid
+            && v.target_folder_safe
+        {
             ProviderStatusDto::ready(format!("Will push to {}", settings.github_repo_url))
         } else {
-            ProviderStatusDto::warning(v.message.unwrap_or_else(|| "Sync settings incomplete.".into()))
+            ProviderStatusDto::warning(
+                v.message
+                    .unwrap_or_else(|| "Sync settings incomplete.".into()),
+            )
         }
     };
 
@@ -165,8 +188,8 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
     if mic.state != "ready" {
         blocking.push("microphone".into());
     }
-    if gemini_state.state != "ready" && gemini_state.state != "warning" {
-        blocking.push("Gemini key".into());
+    if transcription_state.state != "ready" && transcription_state.state != "warning" {
+        blocking.push("selected parser key".into());
     }
     if folder.state != "ready" {
         blocking.push("sessions folder".into());
@@ -181,7 +204,8 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
     Ok(AppStatusDto {
         mic,
         system_audio,
-        gemini: gemini_state,
+        transcription: transcription_state,
+        providers,
         folder,
         github,
         git: git_status,
@@ -189,4 +213,23 @@ pub async fn get_app_status(state: State<'_, AppState>) -> AppResult<AppStatusDt
         can_record,
         blocking_reason,
     })
+}
+
+fn provider_status(
+    provider: TranscriptionProvider,
+    cached_validations: &BTreeMap<TranscriptionProvider, ProviderStatusDto>,
+) -> ProviderStatusDto {
+    let key_present = secrets::has_transcription_key(provider);
+    match (key_present, cached_validations.get(&provider).cloned()) {
+        (_, Some(v)) if v.state == "ready" || v.state == "warning" => v,
+        (true, Some(v)) => v,
+        (true, None) => ProviderStatusDto::ready(format!(
+            "{} key saved. Press Validate to test.",
+            provider.label()
+        )),
+        (false, _) => ProviderStatusDto::missing(format!(
+            "Paste a {} API key to enable this parser.",
+            provider.label()
+        )),
+    }
 }

@@ -120,21 +120,23 @@ pub fn push_session(
     if settings.git_lfs_enabled {
         run_git(&tmp_path, &["lfs", "install"], false)?;
         run_git(&tmp_path, &["lfs", "track", "*.wav"], false)?;
+        run_git(&tmp_path, &["lfs", "track", "*.flac"], false)?;
     }
 
     let target = tmp_path.join(&settings.github_target_folder);
     std::fs::create_dir_all(&target)
         .map_err(|e| AppError::Git(format!("cannot create target folder: {e}")))?;
 
-    if let Some(wav) = session.wav_path.as_deref() {
-        let wav_src = Path::new(wav);
-        if wav_src.exists() {
+    if let Some(audio) = session.audio_path.as_deref() {
+        let audio_src = Path::new(audio);
+        if audio_src.exists() {
             let dst = target.join(
-                wav_src
+                audio_src
                     .file_name()
-                    .unwrap_or_else(|| std::ffi::OsStr::new("session.wav")),
+                    .unwrap_or_else(|| std::ffi::OsStr::new("session.audio")),
             );
-            std::fs::copy(wav_src, &dst).map_err(|e| AppError::Git(format!("copy wav: {e}")))?;
+            std::fs::copy(audio_src, &dst)
+                .map_err(|e| AppError::Git(format!("copy audio: {e}")))?;
         }
     }
     if let Some(tp) = &session.transcript_path {
@@ -265,7 +267,7 @@ fn redact_url(text: &str) -> String {
         let after = &rest[idx + 3..];
         // Find the end of the authority segment: first '/', '?', '#', whitespace, quote, or EOS.
         let authority_end = after
-            .find(|c: char| matches!(c, '/' | '?' | '#' | ' ' | '"' | '\'' | '\t' | '\n' | '\r'))
+            .find(['/', '?', '#', ' ', '"', '\'', '\t', '\n', '\r'])
             .unwrap_or(after.len());
         let authority = &after[..authority_end];
         if let Some(at_pos) = authority.find('@') {
