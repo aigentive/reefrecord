@@ -71,7 +71,7 @@ pub enum TranscriptionUsage {
 }
 
 impl TranscriptionUsage {
-    pub fn add(self, other: Self) -> Self {
+    pub fn merge(self, other: Self) -> Self {
         match (self, other) {
             (
                 Self::Tokens {

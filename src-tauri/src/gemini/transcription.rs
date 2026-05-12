@@ -60,7 +60,7 @@ pub async fn transcribe(
         )
         .await?;
         collected_text.push(text);
-        total_usage = total_usage.add(usage);
+        total_usage = total_usage.merge(usage);
         last_model = model_used;
         // Clean up chunk file if split.
         if chunk_path != &job.wav_path {

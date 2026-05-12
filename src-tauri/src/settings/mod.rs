@@ -254,8 +254,10 @@ impl SettingsStore {
     }
 
     pub fn set_sessions_dir(&self, dir: String) -> AppResult<Settings> {
-        let mut input = SettingsInput::default();
-        input.sessions_dir = Some(Some(dir));
+        let input = SettingsInput {
+            sessions_dir: Some(Some(dir)),
+            ..Default::default()
+        };
         self.update(input)
     }
 
@@ -339,23 +341,25 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = SettingsStore::load_or_default(dir.path());
 
-        let mut input = SettingsInput::default();
-        input.sessions_dir = Some(Some("/tmp/reef sessions".into()));
-        input.capture_system_audio = Some(false);
-        input.mic_device_selector = Some(Some(" USB Mic ".into()));
-        input.system_audio_device_selector = Some(None);
-        input.gemini_model = Some("primary".into());
-        input.gemini_fallback_model = Some("fallback".into());
-        input.chunk_minutes = Some(999);
-        input.language_hint = Some("Romanian".into());
-        input.include_speaker_labels = Some(false);
-        input.include_timestamps = Some(false);
-        input.gemini_input_cost_per_million_usd = Some(-1.0);
-        input.gemini_output_cost_per_million_usd = Some(4.5);
-        input.github_sync_enabled = Some(true);
-        input.github_repo_url = Some("  git@github.com:org/repo.git  ".into());
-        input.github_target_folder = Some("/meetings/".into());
-        input.git_lfs_enabled = Some(false);
+        let input = SettingsInput {
+            sessions_dir: Some(Some("/tmp/reef sessions".into())),
+            capture_system_audio: Some(false),
+            mic_device_selector: Some(Some(" USB Mic ".into())),
+            system_audio_device_selector: Some(None),
+            gemini_model: Some("primary".into()),
+            gemini_fallback_model: Some("fallback".into()),
+            chunk_minutes: Some(999),
+            language_hint: Some("Romanian".into()),
+            include_speaker_labels: Some(false),
+            include_timestamps: Some(false),
+            gemini_input_cost_per_million_usd: Some(-1.0),
+            gemini_output_cost_per_million_usd: Some(4.5),
+            github_sync_enabled: Some(true),
+            github_repo_url: Some("  git@github.com:org/repo.git  ".into()),
+            github_target_folder: Some("/meetings/".into()),
+            git_lfs_enabled: Some(false),
+            ..Default::default()
+        };
 
         let saved = store.update(input).unwrap();
 
@@ -380,9 +384,11 @@ mod tests {
         assert!(raw.contains("\"githubRepoUrl\": \"git@github.com:org/repo.git\""));
         assert!(!raw.contains("gemini_api_key"));
 
-        let mut clear = SettingsInput::default();
-        clear.github_target_folder = Some("   ".into());
-        clear.chunk_minutes = Some(0);
+        let clear = SettingsInput {
+            github_target_folder: Some("   ".into()),
+            chunk_minutes: Some(0),
+            ..Default::default()
+        };
         let saved = store.update(clear).unwrap();
         assert_eq!(saved.github_target_folder, "sessions");
         assert_eq!(saved.chunk_minutes, 1);

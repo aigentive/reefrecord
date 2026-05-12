@@ -265,7 +265,7 @@ fn redact_url(text: &str) -> String {
         let after = &rest[idx + 3..];
         // Find the end of the authority segment: first '/', '?', '#', whitespace, quote, or EOS.
         let authority_end = after
-            .find(|c: char| matches!(c, '/' | '?' | '#' | ' ' | '"' | '\'' | '\t' | '\n' | '\r'))
+            .find(['/', '?', '#', ' ', '"', '\'', '\t', '\n', '\r'])
             .unwrap_or(after.len());
         let authority = &after[..authority_end];
         if let Some(at_pos) = authority.find('@') {

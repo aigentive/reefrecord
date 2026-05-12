@@ -83,7 +83,7 @@ pub async fn transcribe(
             transcribe_chunk(&client, &key, settings, chunk_path.clone(), *offset_s).await?;
         model_used = settings.openai_model.clone();
         collected_text.push(response.text);
-        total_usage = total_usage.add(response.usage);
+        total_usage = total_usage.merge(response.usage);
         if chunk_path != &wav_path {
             let _ = std::fs::remove_file(chunk_path);
         }

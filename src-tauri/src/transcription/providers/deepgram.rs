@@ -36,7 +36,7 @@ pub async fn transcribe(
     wav_path: PathBuf,
 ) -> AppResult<TranscriptionOutcome> {
     let client = http_client()?;
-    let chunk_minutes = settings.chunk_minutes.min(9).max(1) as u64;
+    let chunk_minutes = settings.chunk_minutes.clamp(1, 9) as u64;
     let chunks = split_wav_with_policy(
         &wav_path,
         ChunkPolicy {
@@ -65,7 +65,7 @@ pub async fn transcribe(
         let response =
             transcribe_chunk(&client, &key, settings, chunk_path.clone(), *offset_s).await?;
         collected_text.push(response.text);
-        total_usage = total_usage.add(response.usage);
+        total_usage = total_usage.merge(response.usage);
         if chunk_path != &wav_path {
             let _ = std::fs::remove_file(chunk_path);
         }

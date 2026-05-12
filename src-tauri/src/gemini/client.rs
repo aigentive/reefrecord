@@ -66,7 +66,7 @@ pub struct GeminiUsage {
 }
 
 impl GeminiUsage {
-    pub fn add(self, other: GeminiUsage) -> Self {
+    pub fn merge(self, other: GeminiUsage) -> Self {
         Self {
             prompt_tokens: self.prompt_tokens + other.prompt_tokens,
             output_tokens: self.output_tokens + other.output_tokens,
@@ -375,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn usage_add_sums_each_counter() {
+    fn usage_merge_sums_each_counter() {
         let a = GeminiUsage {
             prompt_tokens: 1,
             output_tokens: 2,
@@ -387,7 +387,7 @@ mod tests {
             total_tokens: 30,
         };
 
-        let out = a.add(b);
+        let out = a.merge(b);
 
         assert_eq!(out.prompt_tokens, 11);
         assert_eq!(out.output_tokens, 22);

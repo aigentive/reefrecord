@@ -65,7 +65,7 @@ pub async fn transcribe(
         )
         .await?;
         collected_text.push(text);
-        total_usage = total_usage.add(usage);
+        total_usage = total_usage.merge(usage);
         last_model = model_used;
         if chunk_path != &wav_path {
             let _ = std::fs::remove_file(chunk_path);
